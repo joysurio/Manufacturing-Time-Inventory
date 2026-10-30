@@ -1,0 +1,54 @@
+@model IEnumerable<ManufacturingTimeTracking.Controllers.ReportByModelRow>
+@{
+    ViewData["Title"] = "Report by Model / Type";
+}
+<div class="animate-fade-in">
+    <div class="mb-6">
+        <a asp-action="Reports" class="inline-flex items-center text-slate-600 hover:text-slate-800 font-medium mb-3">← Back to reports</a>
+        <h1 class="text-2xl font-bold text-slate-800">Report by Model / Type</h1>
+        <p class="text-slate-500">Stock grouped by item model or type.</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 table-fixed w-full">
+                <thead class="bg-slate-50/80">
+                    <tr>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Model / Type</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Total units</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Item count</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Items</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var r in Model)
+                    {
+                        <tr class="table-row-hover">
+                            <td class="px-6 py-4 text-center font-medium text-slate-800">@r.ModelOrType</td>
+                            <td class="px-6 py-4 text-center text-slate-600">@r.TotalQuantity</td>
+                            <td class="px-6 py-4 text-center text-slate-600">@r.ItemCount</td>
+                            <td class="px-6 py-4 text-center">
+                                <ul class="space-y-0.5 text-sm text-slate-600">
+                                    @foreach (var line in r.Lines.OrderByDescending(x => x.TotalQty).Take(30))
+                                    {
+                                        <li>@line.Sku — @line.Name: <strong class="text-slate-800">@line.TotalQty</strong></li>
+                                    }
+                                    @if (r.Lines.Count > 30)
+                                    {
+                                        <li class="text-slate-400">… and @(r.Lines.Count - 30) more</li>
+                                    }
+                                </ul>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @{
+        var pagination = ViewBag.Pagination as ManufacturingTimeTracking.Models.PaginationInfo;
+    }
+    @if (pagination != null)
+    {
+        <partial name="~/Pages/Shared/_Pagination.cshtml" model="pagination" />
+    }
+</div>

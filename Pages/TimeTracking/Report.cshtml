@@ -1,0 +1,223 @@
+@page
+@model ManufacturingTimeTracking.Pages.TimeTracking.ReportModel
+@{
+    ViewData["Title"] = "Time Tracking Report";
+    var from = Model.FromDate ?? DateTime.UtcNow.Date.AddDays(-7);
+    var to = Model.ToDate ?? DateTime.UtcNow.Date;
+}
+
+<style>
+    .time-report-surface {
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.08), transparent 35%),
+                    radial-gradient(circle at 80% 0%, rgba(244,114,182,0.08), transparent 30%),
+                    #050915;
+        color: #f8fafc;
+        font-weight: 300;
+        border: 1px solid rgba(56,189,248,0.45);
+        box-shadow: 0 0 30px rgba(56,189,248,0.25), 0 0 60px rgba(56,189,248,0.12);
+    }
+    .time-report-panel {
+        background: rgba(10,14,26,0.9);
+        border: 1px solid rgba(125,211,252,0.35);
+        box-shadow: 0 0 22px rgba(125,211,252,0.2);
+    }
+    .time-report-heading { color: #fff; font-weight: 500; letter-spacing: 0.01em; }
+    .time-report-text { color: #e2e8f0; font-weight: 300; }
+    .time-report-thin { font-weight: 300; color: #f1f5f9; }
+    .btn-glow-blue {
+        border: 1px solid rgba(59,130,246,0.6);
+        background: #0b1224;
+        color: #f8fafc;
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+    }
+    .input-dark {
+        border: 1px solid rgba(148,163,184,0.35);
+        background: #0f172a;
+        color: #f8fafc;
+        font-weight: 300;
+        box-shadow: inset 0 0 8px rgba(59,130,246,0.25);
+    }
+    .clock-neon {
+        position: relative;
+        width: 104px;
+        height: 104px;
+        border-radius: 9999px;
+        background: radial-gradient(circle at 30% 30%, rgba(57,255,20,0.12), #050915 55%, #020617);
+        border: 3px solid rgba(57,255,20,0.85);
+        box-shadow:
+            0 0 8px rgba(57,255,20,0.95),
+            0 0 24px rgba(57,255,20,0.65),
+            0 0 48px rgba(57,255,20,0.35),
+            inset 0 0 20px rgba(0,0,0,0.45);
+        color: #c0ffc0;
+        font-family: 'Share Tech Mono', 'Consolas', monospace;
+    }
+    .clock-neon .clock-face { position: absolute; inset: 12px; border-radius: 9999px; border: 1px dashed rgba(57,255,20,0.4); }
+    .clock-neon .clock-number { position: absolute; font-size: 12px; font-weight: 700; color: #f8fafc; text-shadow: 0 0 8px rgba(57,255,20,0.55), 0 0 2px rgba(0,0,0,0.8); }
+    .number-12 { top: -1px; left: 50%; transform: translateX(-50%); }
+    .number-3 { right: 1px; top: 50%; transform: translateY(-50%); }
+    .number-6 { bottom: -1px; left: 50%; transform: translateX(-50%); }
+    .number-9 { left: 1px; top: 50%; transform: translateY(-50%); }
+    .clock-hand { position: absolute; left: 50%; top: 50%; transform-origin: bottom center; }
+    .hand-hour { width: 3px; height: 26px; background: #e2ffe0; box-shadow: 0 0 10px rgba(57,255,20,0.85); border-radius: 9999px; }
+    .hand-minute { width: 2px; height: 34px; background: #86ff6a; box-shadow: 0 0 12px rgba(57,255,20,0.8); border-radius: 9999px; }
+    .hand-second { width: 1px; height: 38px; background: #bef264; box-shadow: 0 0 8px rgba(190,242,100,0.9); }
+    .clock-center-dot { position: absolute; width: 7px; height: 7px; border-radius: 9999px; background: #facc15; left: 50%; top: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(250,204,21,0.85); z-index: 2; }
+    .clock-digital { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #39ff14; text-shadow: 0 0 10px rgba(57,255,20,0.9), 0 0 20px rgba(57,255,20,0.45); white-space: nowrap; }
+</style>
+
+<div class="animate-fade-in page-dark">
+    <div class="mb-6">
+        <a asp-page="./Index" class="inline-flex items-center px-4 py-2 rounded-xl btn-glow-blue hover:bg-slate-900 transition-all duration-200">← Time Tracking</a>
+    </div>
+
+    <div class="time-report-surface rounded-3xl p-6 mb-6">
+        <div class="flex items-center gap-4 mb-1">
+            <h1 class="text-2xl time-report-heading">Time Tracking Report</h1>
+            <div class="clock-neon ml-8" id="neonClock">
+                <div class="clock-face"></div>
+                <div class="clock-number number-12">12</div>
+                <div class="clock-number number-3">3</div>
+                <div class="clock-number number-6">6</div>
+                <div class="clock-number number-9">9</div>
+                <div class="clock-hand hand-hour" id="handHour"></div>
+                <div class="clock-hand hand-minute" id="handMinute"></div>
+                <div class="clock-hand hand-second" id="handSecond"></div>
+                <div class="clock-center-dot"></div>
+                <div class="clock-digital" id="clockDigital">--:--:--</div>
+            </div>
+        </div>
+        <p class="time-report-text text-sm mb-6">Effective work time, break time, and session counts per user. Use for productivity and technician efficiency.</p>
+
+        <form method="get" class="flex flex-wrap items-end gap-4 mb-6">
+            <div>
+                <label class="block text-xs font-medium text-slate-200 mb-1">From date</label>
+                <input type="date" name="FromDate" value="@from.ToString("yyyy-MM-dd")" class="px-3 py-2 rounded-xl input-dark focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40" />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-200 mb-1">To date</label>
+                <input type="date" name="ToDate" value="@to.ToString("yyyy-MM-dd")" class="px-3 py-2 rounded-xl input-dark focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40" />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-200 mb-1">User</label>
+                <select name="UserIdFilter" asp-items="Model.UserSelectList" class="px-3 py-2 rounded-xl input-dark focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40 min-w-[180px]"></select>
+            </div>
+            <button type="submit" class="px-4 py-2 rounded-xl btn-glow-blue font-medium hover:bg-slate-900">Apply</button>
+        </form>
+
+        <div class="mb-4">
+            <a href="#compare-section" class="text-sm text-slate-300 hover:underline">Go to: Comparativa por técnico y tarea</a>
+        </div>
+
+        <div class="time-report-panel rounded-2xl p-4 shadow-soft">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-700 text-sm table-dark">
+                    <thead class="bg-slate-900/60">
+                         <tr>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">User</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Total worked</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Break time</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Effective work</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Sessions</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Breaks</th>
+                         </tr>
+                     </thead>
+                <tbody class="divide-y divide-slate-700">
+                     @foreach (var r in Model.Rows)
+                     {
+                        <tr class="hover:bg-slate-800/60 time-report-thin">
+                            <td class="px-4 py-3 font-medium text-center text-white">@r.DisplayName</td>
+                            <td class="px-4 py-3 text-center text-slate-100">@ReportModel.FormatDuration(r.TotalWorked)</td>
+                            <td class="px-4 py-3 text-center text-slate-300">@ReportModel.FormatDuration(r.TotalBreak)</td>
+                            <td class="px-4 py-3 text-center font-semibold text-emerald-300">@ReportModel.FormatDuration(r.EffectiveWork)</td>
+                            <td class="px-4 py-3 text-center text-slate-200">@r.SessionCount</td>
+                            <td class="px-4 py-3 text-center text-slate-200">@r.BreakCount</td>
+                         </tr>
+                     }
+                 </tbody>
+             </table>
+         </div>
+
+         @if (!Model.Rows.Any())
+         {
+            <p class="time-report-text time-report-thin py-6">No time tracking data in the selected period.</p>
+         }
+         else
+         {
+            <p class="time-report-text time-report-thin text-sm mt-4">Effective work = Total worked − Break time. Use with activity reports for productivity and idle time analysis.</p>
+         }
+     </div>
+ </div>
+
+@* New: Comparativa por técnico y tarea *@
+<div id="compare-section" class="time-report-panel rounded-2xl p-4 mb-6">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg time-report-heading">Comparativa por técnico y tarea</h2>
+        <span class="text-xs text-slate-200">Promedios por tarea</span>
+    </div>
+    <div class="overflow-x-auto table-scroll">
+        @if (!Model.CompareRows.Any())
+        {
+            <p class="text-slate-400 p-4">No data for the selected filters.</p>
+        }
+        else
+        {
+            <table class="min-w-full divide-y divide-slate-700 text-xs table-report">
+                <thead class="bg-slate-900/60">
+                    <tr>
+                        <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Task</th>
+                        <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Users (avg · runs)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700">
+                    @foreach (var row in Model.CompareRows)
+                    {
+                        <tr class="hover:bg-slate-800/40">
+                            <td class="px-3 py-2 text-slate-100 font-medium">@row.StepTitle</td>
+                            <td class="px-3 py-2 text-slate-100">
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach (var u in row.UserStats)
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-slate-600 bg-slate-900/70 text-[11px] whitespace-nowrap">
+                                            <strong class="text-blue-200">@u.UserDisplayName</strong>
+                                            <span class="text-slate-300">· @ReportModel.FormatDuration(TimeSpan.FromSeconds(u.AverageSeconds))</span>
+                                            <span class="text-slate-500">(@u.Runs)</span>
+                                        </span>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+}
+
+@section Scripts {
+   <script>
+   (function () {
+    function pad(v) { return v.toString().padStart(2, '0'); }
+    function updateClock() {
+        var now = new Date();
+        var h = now.getHours();
+        var m = now.getMinutes();
+        var s = now.getSeconds();
+        var hourDeg = (h % 12 + m / 60) * 30;
+        var minDeg = (m + s / 60) * 6;
+        var secDeg = s * 6;
+        var hh = document.getElementById('handHour');
+        var hm = document.getElementById('handMinute');
+        var hs = document.getElementById('handSecond');
+        if (hh) hh.style.transform = 'translate(-50%, -100%) rotate(' + hourDeg + 'deg)';
+        if (hm) hm.style.transform = 'translate(-50%, -100%) rotate(' + minDeg + 'deg)';
+        if (hs) hs.style.transform = 'translate(-50%, -100%) rotate(' + secDeg + 'deg)';
+        var dg = document.getElementById('clockDigital');
+        if (dg) dg.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+   })();
+   </script>
+}

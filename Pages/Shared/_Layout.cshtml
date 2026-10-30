@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Manufacturing Time Tracking and Inventory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            animation: {
+              'fade-in': 'fadeIn 0.4s ease-out forwards',
+              'slide-up': 'slideUp 0.45s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+              slideUp: { '0%': { opacity: '0', transform: 'translateY(12px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            },
+            boxShadow: {
+              'soft': '0 2px 15px -3px rgba(0,0,0,0.07), 0 10px 20px -2px rgba(0,0,0,0.04)',
+              'card': '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)',
+              'card-hover': '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+            },
+          },
+        },
+      }
+    </script>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ManufacturingTimeTracking.styles.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+    <style>
+        /* Hide scrollbar on the main page content area */
+        main {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        main::-webkit-scrollbar {
+            display: none;
+        }
+        /* Fixed/sticky table headers — applies to all tables inside overflow-x-auto containers */
+        .overflow-x-auto {
+            overflow-x: auto;
+            overflow-y: visible;
+            max-height: none;
+            scrollbar-width: thin;
+            scrollbar-color: transparent transparent;
+            transition: scrollbar-color 0.3s;
+        }
+        .overflow-x-auto:hover,
+        .overflow-x-auto:active {
+            scrollbar-color: rgba(148,163,184,0.5) transparent;
+        }
+        .overflow-x-auto::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .overflow-x-auto::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .overflow-x-auto::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 3px;
+        }
+        .overflow-x-auto:hover::-webkit-scrollbar-thumb,
+        .overflow-x-auto:active::-webkit-scrollbar-thumb {
+            background: rgba(148,163,184,0.5);
+        }
+        .overflow-x-auto:hover::-webkit-scrollbar-thumb:hover {
+            background: rgba(148,163,184,0.8);
+        }
+        .overflow-x-auto > table > thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .overflow-x-auto > table > thead th {
+            background-color: rgb(248, 250, 252) !important;
+            box-shadow: inset 0 -2px 0 rgb(226, 232, 240);
+        }
+        #mobile-menu-panel {
+            display: none;
+        }
+    </style>
+</head>
+<body class="h-screen text-slate-200 antialiased flex flex-col overflow-hidden" style="background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.12), transparent 38%), radial-gradient(circle at 80% 0%, rgba(99,102,241,0.12), transparent 32%), #060b1b;">
+    <header class="shrink-0 sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-soft">
+        <nav class="w-full mx-auto px-2 sm:px-4 lg:px-6 xl:px-8">
+            <div class="flex justify-between items-center h-16 gap-2">
+                <div class="flex items-center shrink-0 min-w-0">
+                    <a asp-area="" asp-page="/Index" class="text-base sm:text-lg xl:text-xl font-bold text-slate-800 hover:text-blue-600 transition-colors duration-200 flex items-center gap-1.5 sm:gap-2">
+                        <span class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs sm:text-sm font-extrabold shrink-0">M</span>
+                        <span class="hidden sm:inline">MTI</span>
+                        <!-- <span class="hidden sm:inline">Manufacturing Time and Inventory</span> -->
+                        <span class="sm:hidden">M Time</span>
+                    </a>
+                </div>
+                <div class="hidden xl:flex items-center gap-0.5 2xl:gap-1 justify-around min-w-0 flex-1">
+                    <div class="flex items-center gap-0.5 xl:gap-1 flex-wrap justify-end min-w-0">
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <a asp-area="" asp-page="/Admin/Users/Index" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium text-xs xl:text-sm 2xl:text-base whitespace-nowrap shrink-0">Users</a>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Operator") || User.IsInRole("Supervisor") || User.IsInRole("Normal"))
+                        {
+
+                            <a asp-area="" asp-page="/TimeTracking/Index" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium text-xs xl:text-sm 2xl:text-base whitespace-nowrap shrink-0">Time Tracking</a>
+                            <a asp-area="" asp-page="/Catalog/Models/Index" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium text-xs xl:text-sm 2xl:text-base whitespace-nowrap shrink-0">Models</a>
+                            <a asp-area="" asp-page="/Templates/Index" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium text-xs xl:text-sm 2xl:text-base whitespace-nowrap shrink-0">Templates</a>
+                            <div class="relative group shrink-0">
+                                <button type="button" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium inline-flex items-center gap-1 text-xs xl:text-sm 2xl:text-base whitespace-nowrap">
+                                    Resources <svg class="w-3 h-3 xl:w-4 xl:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                                <div class="absolute right-0 xl:left-0 mt-1 w-48 py-2 bg-white rounded-xl shadow-card border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top z-50">
+                                    <a asp-page="/Tools/Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Tools</a>
+                                    <a asp-page="/Materials/Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Materials</a>
+                                    <a asp-page="/MaterialSets/Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Material Sets</a>
+                                    <a asp-page="/Suppliers/Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Suppliers</a>
+                                </div>
+                            </div>
+                            <a asp-area="" asp-page="/Orders/Sales" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium text-xs xl:text-sm 2xl:text-base whitespace-nowrap shrink-0">Sales Orders</a>
+                            <a asp-area="" asp-page="/Orders/Index" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium text-xs xl:text-sm 2xl:text-base whitespace-nowrap shrink-0">Orders</a>
+                            <a asp-area="" asp-page="/Tasks/Index" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium text-xs xl:text-sm 2xl:text-base whitespace-nowrap shrink-0">Tasks</a>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <div class="relative group shrink-0">
+                                    <button type="button" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium inline-flex items-center gap-1 text-xs xl:text-sm 2xl:text-base whitespace-nowrap">
+                                        Reports <svg class="w-3 h-3 xl:w-4 xl:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </button>
+                                    <div class="absolute right-0 xl:left-0 mt-1 w-64 py-2 bg-white rounded-xl shadow-card border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top z-50">
+                                        <a asp-area="" asp-page="/Orders/ReportTimeByUser" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Time report (tasks)</a>
+                                        <a asp-area="" asp-page="/TimeTracking/Report" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Time report (clock in/out)</a>
+                                        @if (User.IsInRole("Admin") || User.IsInRole("Supervisor"))
+                                        {
+                                            <a asp-area="" asp-page="/TimeTracking/DayEvaluationsReport" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Day evaluations (clock-out)</a>
+                                        }
+                                        <a asp-area="" asp-page="/Reports/ModelMachinesAnalysis" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Model machines analysis</a>
+                                        @if (User.IsInRole("Admin"))
+                                        {
+                                            <a asp-area="" asp-page="/TimeTracking/EditRecords" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Edit time records (admin)</a>
+                                        }
+                                        <a asp-area="" asp-page="/PlantMonitor/Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Plant Monitor</a>
+                                        <a asp-area="" asp-page="/Reports/KpisSupervisor" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">KPIs (Supervisor)</a>
+                                    </div>
+                                </div>
+                                <div class="relative group shrink-0">
+                                    <button type="button" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-violet-700 hover:bg-violet-50 hover:text-violet-900 transition-all duration-200 font-medium inline-flex items-center gap-1 text-xs xl:text-sm 2xl:text-base whitespace-nowrap">
+                                        <svg class="w-3 h-3 xl:w-4 xl:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347A3.5 3.5 0 0114.5 21h-5a3.5 3.5 0 01-2.5-1.053l-.346-.347z"/></svg>
+                                        AI <svg class="w-3 h-3 xl:w-4 xl:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </button>
+                                    <div class="absolute right-0 xl:left-0 mt-1 w-72 py-2 bg-white rounded-xl shadow-card border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top z-50">
+                                        <a asp-area="" asp-page="/AI/ActivityReport" class="block px-4 py-2.5 text-slate-600 hover:bg-violet-50 hover:text-violet-700 rounded-lg mx-2 transition-colors">Generate Activity Report</a>
+                                        <a asp-area="" asp-page="/AI/TechnicianReport" class="block px-4 py-2.5 text-slate-600 hover:bg-violet-50 hover:text-violet-700 rounded-lg mx-2 transition-colors">Technician Improvement Report</a>
+                                        @if (User.IsInRole("Admin"))
+                                        {
+                                            <div class="border-t border-slate-100 my-2"></div>
+                                            <a asp-area="" asp-page="/AI/Prompts/Index" class="block px-4 py-2.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700 rounded-lg mx-2 transition-colors text-xs">Manage AI Prompts</a>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Inventory"))
+                        {
+                            <div class="relative group shrink-0">
+                                <button type="button" class="px-1.5 xl:px-2 2xl:px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all duration-200 font-medium inline-flex items-center gap-1 text-xs xl:text-sm 2xl:text-base whitespace-nowrap">
+                                    Inventory <svg class="w-3 h-3 xl:w-4 xl:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                                <div class="absolute right-0 xl:left-0 mt-1 w-52 py-2 bg-white rounded-xl shadow-card border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top z-50">
+                                    <a asp-controller="Items" asp-action="Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Items</a>
+                                    <a asp-controller="Locations" asp-action="Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Locations</a>
+                                    <a asp-controller="Inventory" asp-action="Receive" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Receive</a>
+                                    <a asp-controller="Inventory" asp-action="MaterialOut" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Material Out</a>
+                                    <a asp-page="/MaterialSets/Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Material Sets</a>
+                                    <a asp-controller="Inventory" asp-action="Stock" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Stock</a>
+                                    <a asp-controller="Inventory" asp-action="StockByLocation" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Stock by Location</a>
+                                    <a asp-controller="Inventory" asp-action="Movements" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Movements</a>
+                                    <a asp-controller="StoragePick" asp-action="Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Storage Pick</a>
+                                    <div class="border-t border-slate-100 my-2"></div>
+                                    <a asp-controller="Inventory" asp-action="Reports" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Reports</a>
+                                    <a asp-controller="Operations" asp-action="Index" class="block px-4 py-2.5 text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg mx-2 transition-colors">Operations</a>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <partial name="_LoginPartial" />
+                </div>
+                <div class="flex items-center xl:hidden shrink-0">
+                    <button
+                        type="button"
+                        class="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                        aria-label="Menu"
+                        onclick="(function(){var p=document.getElementById('mobile-menu-panel');if(!p)return;var open=(p.style.display==='block');p.style.display=open?'none':'block';document.body.classList.toggle('overflow-hidden',!open);}())">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    @* Mobile menu — lives OUTSIDE header so backdrop-blur-sm does not trap position:fixed *@
+    <div id="mobile-menu-panel" class="xl:hidden fixed inset-x-0 top-16 bottom-0 z-50 bg-white border-t border-slate-200 overflow-y-auto overscroll-contain">
+        <div id="mobile-menu" class="px-4 py-4">
+            <a asp-page="/Index" class="block py-2 text-slate-600">Home</a>
+            @if (User.IsInRole("Admin"))
+            {
+                <a asp-page="/Admin/Users/Index" class="block py-2 text-slate-600">Manage Users</a>
+            }
+            @if (User.IsInRole("Admin") || User.IsInRole("Operator") || User.IsInRole("Supervisor") || User.IsInRole("Normal"))
+            {
+                <a asp-page="/Catalog/Models/Index" class="block py-2 text-slate-600">Models</a>
+                <a asp-page="/Templates/Index" class="block py-2 text-slate-600">Templates</a>
+                <a asp-page="/Tools/Index" class="block py-2 pl-4 text-slate-500 text-sm">Tools</a>
+                <a asp-page="/Materials/Index" class="block py-2 pl-4 text-slate-500 text-sm">Materials</a>
+                <a asp-page="/MaterialSets/Index" class="block py-2 pl-4 text-slate-500 text-sm">Material Sets</a>
+                <a asp-page="/Suppliers/Index" class="block py-2 pl-4 text-slate-500 text-sm">Suppliers</a>
+                <a asp-page="/Orders/Sales" class="block py-2 text-slate-600">Sales Orders</a>
+                <a asp-page="/Orders/Index" class="block py-2 text-slate-600">Orders</a>
+                <a asp-page="/Tasks/Index" class="block py-2 text-slate-600">Tasks</a>
+                <a asp-page="/TimeTracking/Index" class="block py-2 text-slate-600">Time Tracking</a>
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="pt-2">
+                        <div class="px-0 py-2 text-slate-600 font-medium">Reports</div>
+                        <a asp-page="/Orders/ReportTimeByUser" class="block py-2 pl-4 text-slate-500 text-sm">Time report (tasks)</a>
+                        <a asp-page="/TimeTracking/Report" class="block py-2 pl-4 text-slate-500 text-sm">Time report (clock in/out)</a>
+                        @if (User.IsInRole("Admin") || User.IsInRole("Supervisor"))
+                        {
+                            <a asp-page="/TimeTracking/DayEvaluationsReport" class="block py-2 pl-4 text-slate-500 text-sm">Day evaluations (clock-out)</a>
+                        }
+                        <a asp-page="/Reports/ModelMachinesAnalysis" class="block py-2 pl-4 text-slate-500 text-sm">Model machines analysis</a>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <a asp-page="/TimeTracking/EditRecords" class="block py-2 pl-4 text-slate-500 text-sm">Edit time records (admin)</a>
+                        }
+                        <a asp-area="" asp-page="/PlantMonitor/Index" class="block py-2 pl-4 text-slate-500 text-sm">Plant Monitor</a>
+                    </div>
+                    <div class="pt-2">
+                        <div class="px-0 py-2 text-violet-700 font-medium flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347A3.5 3.5 0 0114.5 21h-5a3.5 3.5 0 01-2.5-1.053l-.346-.347z"/></svg>
+                            AI
+                        </div>
+                        <a asp-page="/AI/ActivityReport" class="block py-2 pl-4 text-slate-500 text-sm">Generate Activity Report</a>
+                        <a asp-page="/AI/TechnicianReport" class="block py-2 pl-4 text-slate-500 text-sm">Technician Improvement Report</a>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <a asp-page="/AI/Prompts/Index" class="block py-2 pl-4 text-slate-500 text-sm">Manage AI Prompts</a>
+                        }
+                    </div>
+                }
+            }
+            @if (User.IsInRole("Admin") || User.IsInRole("Inventory"))
+            {
+                <a asp-controller="Items" asp-action="Index" class="block py-2 text-slate-600">Items</a>
+                <a asp-controller="Locations" asp-action="Index" class="block py-2 text-slate-600">Locations</a>
+                <a asp-controller="Inventory" asp-action="Receive" class="block py-2 text-slate-600">Receive</a>
+                <a asp-controller="Inventory" asp-action="MaterialOut" class="block py-2 text-slate-600">Material Out</a>
+                <a asp-page="/MaterialSets/Index" class="block py-2 text-slate-600">Material Sets</a>
+                <a asp-controller="Inventory" asp-action="Stock" class="block py-2 text-slate-600">Stock</a>
+                <a asp-controller="Inventory" asp-action="StockByLocation" class="block py-2 text-slate-600">Stock by Location</a>
+                <a asp-controller="StoragePick" asp-action="Index" class="block py-2 text-slate-600">Storage Pick</a>
+                <a asp-controller="Inventory" asp-action="Reports" class="block py-2 text-slate-600">Reports</a>
+                <a asp-controller="Operations" asp-action="Index" class="block py-2 text-slate-600">Operations</a>
+            }
+            <div class="pt-2 border-t border-slate-100 mt-2">
+                <partial name="_LoginPartial" />
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-y-scroll page-dark">
+        @RenderBody()
+    </main>
+
+    <footer class="shrink-0 border-t border-slate-700 bg-slate-900/90 mt-auto py-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-300 text-sm">
+            &copy; 2026 Manufacturing Time Tracking And Inventory — <a asp-area="" asp-page="/Privacy" class="text-blue-300 hover:text-blue-200 hover:underline transition-colors">Privacy</a>
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <!-- Responsable approval modal (global) -->
+    <div id="responsableModal" class="tw-modal hidden fixed inset-0 z-50 flex items-center justify-center" aria-hidden="true">
+      <div class="absolute inset-0 bg-black opacity-50" data-modal-close></div>
+      <div class="bg-white rounded-lg p-6 z-60 max-w-xl w-full mx-4" data-modal-content>
+        <h3 class="text-lg font-semibold mb-2">Autorización requerida</h3>
+        <p class="text-sm text-slate-700 mb-3">Para usar esta función se necesita la aprobación del Responsable. Por favor, intenten usar una de las que ya existen. Para continuar, introduzca la contraseña del responsable.</p>
+        <input id="responsablePassword" type="password" class="w-full px-3 py-2 border rounded mb-3" placeholder="Contraseña del responsable" aria-label="Contraseña del responsable" />
+        <div class="flex justify-end gap-2">
+          <button type="button" data-modal-close class="px-4 py-2 rounded border bg-gray-100">Cancelar</button>
+          <button id="responsableConfirm" type="button" class="px-4 py-2 rounded bg-blue-600 text-white">Continuar</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function(){
+        const SECRET = 'paso autorizado por jairo';
+        function requireResponsible(callback, initiatorEl){
+          const modal = document.getElementById('responsableModal');
+          const input = document.getElementById('responsablePassword');
+          const confirmBtn = document.getElementById('responsableConfirm');
+          if(!modal || !input || !confirmBtn) { callback(); return; }
+          // clear
+          input.value = '';
+          window.showModal('responsableModal');
+          // prevent clicks inside modal content from closing via overlay
+          const content = modal.querySelector('[data-modal-content]');
+          if(content && !content._approvalsContentBound){
+            try{ content.addEventListener('click', function(ev){ ev.stopPropagation(); }); content._approvalsContentBound = true; }catch(e){}
+          }
+          const onConfirm = async function(){
+            // ensure modal still visible
+            try{ if(modal.getAttribute('aria-hidden') === 'true') return; } catch(e){}
+            const val = (input.value || '').trim();
+            // send to server for authorization
+              try{
+                const caller = initiatorEl || null;
+                const payload = {
+                  action: caller ? caller.getAttribute('data-action') || undefined : undefined,
+                  target: caller ? caller.getAttribute('href') || undefined : undefined,
+                  templateId: caller ? caller.getAttribute('data-template-id') || undefined : undefined,
+                  modalId: caller ? caller.getAttribute('data-modal-show') || undefined : undefined,
+                  password: val
+                };
+              const apiUrl = '@(Context.Request.PathBase.HasValue ? Context.Request.PathBase.Value : "")/api/approvals/authorize';
+              const resp = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                credentials: 'same-origin'
+              });
+              // Read response body as text for diagnostics
+              const text = await resp.text();
+              const contentType = resp.headers.get('content-type') || '';
+              if(resp.ok){
+                // Try parse JSON, otherwise proceed
+                let parsed = null;
+                if(contentType.indexOf('application/json') >= 0){
+                  try{ parsed = JSON.parse(text); } catch(e){ parsed = null; }
+                }
+                window.hideModal('responsableModal');
+                confirmBtn.removeEventListener('click', onConfirm);
+                // success
+                if(window.toastr) toastr.success('Autorización aceptada.');
+                callback();
+              } else {
+                // Not OK: show message returned by server if any
+                let msg = text || resp.statusText || ('HTTP ' + resp.status);
+                // If JSON with error field, try to extract
+                if(contentType.indexOf('application/json') >= 0){
+                  try{
+                    const j = JSON.parse(text);
+                    if(j && j.error) msg = j.error;
+                  }catch(e){}
+                }
+                if(window.toastr) toastr.error('Autorización fallida: ' + msg);
+                input.value = '';
+                input.focus();
+              }
+            } catch(e){
+              console.error(e);
+              if(window.toastr) toastr.error('Error en autorización.');
+            }
+          };
+          // ensure we don't double-register the handler: track handlers on element properties
+          try { if(confirmBtn._approvalsHandler) confirmBtn.removeEventListener('click', confirmBtn._approvalsHandler); } catch(e) {}
+          confirmBtn._approvalsHandler = onConfirm;
+          confirmBtn.addEventListener('click', confirmBtn._approvalsHandler);
+
+          // bind Enter key on input to confirm (store handler so we can remove later)
+          const onKey = function(ev){ if(ev && (ev.key === 'Enter' || ev.keyCode === 13)) { ev.preventDefault(); onConfirm(); } };
+          try{ if(input._approvalsKeyHandler) input.removeEventListener('keydown', input._approvalsKeyHandler); } catch(e){}
+          input._approvalsKeyHandler = onKey;
+          input.addEventListener('keydown', input._approvalsKeyHandler);
+          // focus
+          setTimeout(()=> input.focus(), 50);
+        }
+
+        document.addEventListener('DOMContentLoaded', function(){
+          // Attach handlers to elements that require responsable approval
+          document.querySelectorAll('[data-requires-responsable]').forEach(function(el){
+            // use capture so this runs before other click handlers (prevents original handlers)
+            el.addEventListener('click', function(evt){
+              // stop other listeners (site.js handlers) from running
+              evt.stopImmediatePropagation();
+              evt.preventDefault();
+              // If element has data-modal-show, open that modal after approval
+              const modalId = el.getAttribute('data-modal-show');
+              const action = el.getAttribute('data-action');
+              const templateId = el.getAttribute('data-template-id');
+              requireResponsible(function(){
+                if(modalId){
+                  if(window.showModal) window.showModal(modalId);
+                  return;
+                }
+                if(action === 'toggleHidden'){
+                  try{
+                    // Call the global toggleHidden function with element context if available
+                    if(window.toggleHidden && templateId) {
+                      try { window.toggleHidden(templateId, el); }
+                      catch(err) { console.error(err); }
+                    }
+                  }catch(err){ console.error(err); }
+                  return;
+                }
+                // For anchors, follow the href
+                if(el.tagName === 'A' && el.href){ window.location = el.href; return; }
+                // No-op fallback
+              }, el);
+            }, true);
+          });
+        });
+        window.requireResponsible = requireResponsible;
+      })();
+    </script>
+    <script>
+      (function () {
+        var panel = document.getElementById('mobile-menu-panel');
+        var menu = document.getElementById('mobile-menu');
+        if (!panel || !menu) return;
+
+        menu.addEventListener('click', function (event) {
+          var target = event.target;
+          if (target && target.closest && target.closest('a')) {
+            panel.style.display = 'none';
+            document.body.classList.remove('overflow-hidden');
+          }
+        });
+
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            panel.style.display = 'none';
+            document.body.classList.remove('overflow-hidden');
+          }
+        });
+      })();
+
+      // Configure toastr defaults
+      toastr.options = {
+        "closeButton": true,
+        "debug": false,
+        "newestOnTop": true,
+        "progressBar": true,
+        "positionClass": "toast-top-right",
+        "preventDuplicates": false,
+        "onclick": null,
+        "showDuration": "300",
+        "hideDuration": "1000",
+        "timeOut": "5000",
+        "extendedTimeOut": "1000",
+        "showEasing": "swing",
+        "hideEasing": "linear",
+        "showMethod": "fadeIn",
+        "hideMethod": "fadeOut"
+      };
+
+      // Show toastr notifications from TempData (all message keys unified to toastr)
+      @if (TempData["ToastrSuccess"] != null) { <text>toastr.success(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["ToastrSuccess"])));</text> }
+      @if (TempData["ToastrError"] != null) { <text>toastr.error(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["ToastrError"])));</text> }
+      @if (TempData["ToastrInfo"] != null) { <text>toastr.info(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["ToastrInfo"])));</text> }
+      @if (TempData["ToastrWarning"] != null) { <text>toastr.warning(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["ToastrWarning"])));</text> }
+      @if (TempData["Success"] != null) { <text>toastr.success(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["Success"])));</text> }
+      @if (TempData["Error"] != null) { <text>toastr.error(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["Error"])));</text> }
+      @if (TempData["PickListSuccess"] != null) { <text>toastr.success(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["PickListSuccess"])));</text> }
+      @if (TempData["PickListError"] != null) { <text>toastr.error(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["PickListError"])));</text> }
+      @if (TempData["ToastrSuccess"] != null) { <text>toastr.success(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["ToastrSuccess"])));</text> }
+      @if (TempData["ToastrError"] != null) { <text>toastr.error(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["ToastrError"])));</text> }
+      @if (TempData["Msg"] != null) { <text>toastr.info(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["Msg"])));</text> }
+      @if (TempData["DeleteError"] != null) { <text>toastr.error(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["DeleteError"])));</text> }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,136 @@
+@page
+@model ManufacturingTimeTracking.Pages.AI.ActivityReportModel
+@{
+    ViewData["Title"] = "AI Activity Report";
+}
+
+<div class="max-w-5xl mx-auto animate-slide-up">
+    <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center text-white shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347A3.5 3.5 0 0114.5 21h-5a3.5 3.5 0 01-2.5-1.053l-.346-.347z"/></svg>
+        </div>
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">AI Activity Report</h1>
+            <p class="text-sm text-slate-500 mt-0.5">AI-powered analysis of manufacturing activity using GPT</p>
+        </div>
+    </div>
+
+    @if (!Model.GptConfigured)
+    {
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+            <svg class="w-5 h-5 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div>
+                <p class="font-medium text-amber-800">OpenAI API key not configured</p>
+                <p class="text-sm text-amber-700 mt-1">Add <code class="bg-amber-100 px-1 rounded">OpenAI:ApiKey</code> to <code class="bg-amber-100 px-1 rounded">appsettings.json</code> to enable AI report generation.</p>
+            </div>
+        </div>
+    }
+
+    <div class="bg-white rounded-2xl shadow-soft p-6">
+        <h1 class="text-xl font-semibold mb-4">AI Activity Report</h1>
+
+        <form id="filterForm" method="get" class="flex items-end gap-3 mb-4">
+            <div>
+                <label class="block text-sm text-slate-600">From</label>
+                <input asp-for="FromDate" type="date" class="px-3 py-2 border rounded" />
+            </div>
+            <div>
+                <label class="block text-sm text-slate-600">To</label>
+                <input asp-for="ToDate" type="date" class="px-3 py-2 border rounded" />
+            </div>
+            <div>
+                <label class="block text-sm text-slate-600">User (optional)</label>
+                <select asp-for="UserIdFilter" asp-items="Model.TechnicianList" class="px-3 py-2 border rounded">
+                    <option value="">— All users —</option>
+                </select>
+            </div>
+            <div>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Apply</button>
+            </div>
+            <div>
+                <button type="button" id="downloadCsv" class="px-3 py-2 bg-slate-800 text-white rounded">Download CSV</button>
+                <button type="button" id="downloadJson" class="px-3 py-2 bg-slate-800 text-white rounded">Download JSON</button>
+            </div>
+        </form>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="col-span-1">
+                <form method="post" asp-page-handler="SavePrompt">
+                    <label class="block text-sm text-slate-600 mb-1">Select Prompt</label>
+                    <select asp-for="SelectedPromptId" asp-items="Model.PromptSelectList" class="w-full px-3 py-2 border rounded mb-2" onchange="onPromptChange(this)"></select>
+                    <label class="block text-sm text-slate-600 mb-1">Prompt</label>
+                    <textarea id="promptText" class="w-full h-56 p-2 border rounded text-sm" asp-for="EditedPromptText"></textarea>
+                    <div class="mt-2 flex gap-2">
+                        <button type="submit" class="px-3 py-2 bg-emerald-600 text-white rounded">Save prompt</button>
+                    </div>
+                </form>
+
+                <!-- Generate form posts to Generate handler and opens result in same tab -->
+                <form id="generateForm" method="post" asp-page-handler="Generate">
+                    <input type="hidden" name="SelectedPromptId" value="@Model.SelectedPromptId" />
+                    <input type="hidden" name="EditedPromptText" id="editedPromptHidden" />
+                    <input type="hidden" name="FromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd") ?? "")" />
+                    <input type="hidden" name="ToDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd") ?? "")" />
+                    <input type="hidden" name="TechnicianId" value="@Model.TechnicianId" />
+                    <input type="hidden" name="MachineModelId" value="@(Model.MachineModelId?.ToString() ?? "")" />
+                    <input type="hidden" name="CustomerName" value="@Model.CustomerName" />
+                    <input type="hidden" name="InterventionType" value="@Model.InterventionType" />
+                    <input type="hidden" name="UserIdFilter" id="userIdHidden" value="@Model.UserIdFilter" />
+                    <div class="mt-4">
+                        <button type="submit" id="btnGenerate" class="px-3 py-2 bg-violet-700 text-white rounded">Generate (show result below)</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="col-span-2">
+                <div class="mb-2">
+                    <h2 class="text-sm font-semibold">Generated report</h2>
+                    <p class="text-xs text-slate-500">The generated report will be shown below when ready.</p>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                {
+                    <div class="p-3 bg-red-50 border border-red-200 text-red-800 rounded">@Model.ErrorMessage</div>
+                }
+                @if (Model.Generated && !string.IsNullOrEmpty(Model.ReportText))
+                {
+                    <div class="p-3 bg-slate-50 border rounded text-sm whitespace-pre-wrap">@Model.ReportText</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    var prompts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PromptsData));
+    function onPromptChange(sel){
+        var id = sel.value;
+        var txt = prompts[id] || "";
+        document.getElementById('promptText').value = txt;
+    }
+
+    // Copy textarea into hidden input before submitting generate form
+    document.getElementById('generateForm').addEventListener('submit', function(e){
+        var txt = document.getElementById('promptText').value || '';
+        document.getElementById('editedPromptHidden').value = txt;
+        // ensure hidden user id reflects selection
+        var userSel = document.querySelector('[name="UserIdFilter"]');
+        var hid = document.getElementById('userIdHidden');
+        if (userSel && hid) hid.value = userSel.value || '';
+    });
+
+    // Download buttons: submit current filter form with handler=DownloadData and format
+    function downloadWithFormat(format){
+        var form = document.getElementById('filterForm');
+        var params = new URLSearchParams(new FormData(form));
+        params.set('handler','DownloadData');
+        params.set('format', format);
+        // include page path
+        var url = window.location.pathname + '?' + params.toString();
+        window.location.href = url;
+    }
+    document.getElementById('downloadCsv').addEventListener('click', function(){ downloadWithFormat('csv'); });
+    document.getElementById('downloadJson').addEventListener('click', function(){ downloadWithFormat('json'); });
+</script>
+}

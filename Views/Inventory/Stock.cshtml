@@ -1,0 +1,333 @@
+@model ManufacturingTimeTracking.Controllers.StockViewModel
+@{
+    ViewData["Title"] = "Stock";
+}
+<style>
+    .time-report-surface {
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.08), transparent 35%),
+                    radial-gradient(circle at 80% 0%, rgba(244,114,182,0.08), transparent 30%),
+                    #0a0f1f;
+        color: #f8fafc;
+        font-weight: 300;
+        border: 1px solid rgba(56,189,248,0.45);
+        box-shadow: 0 0 30px rgba(56,189,248,0.25), 0 0 60px rgba(56,189,248,0.12);
+    }
+    .time-report-panel {
+        background: rgba(15,23,42,0.9);
+        border: 1px solid rgba(125,211,252,0.35);
+        box-shadow: 0 0 22px rgba(125,211,252,0.2);
+    }
+    .time-report-heading {
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+    .time-report-text { color: #e2e8f0; }
+    .table-scroll { max-height: 70vh; overflow-y: auto; overflow-x: auto; }
+    .table-report th { color: #e2e8f0 !important; }
+    .btn-outline-luminous {
+        background: rgba(2,6,23,0.6);
+        color: #ffffff;
+        border: 1px solid rgba(59,130,246,0.55);
+        box-shadow: 0 8px 32px rgba(59,130,246,0.12), 0 0 18px rgba(59,130,246,0.12) inset;
+        transition: box-shadow .18s ease, border-color .12s ease, transform .08s ease;
+        font-weight: 600;
+        padding-left: 1.25rem; padding-right: 1.25rem;
+    }
+    .btn-outline-luminous:hover {
+        border-color: rgba(59,130,246,0.9);
+        box-shadow: 0 10px 40px rgba(59,130,246,0.26), 0 0 36px rgba(59,130,246,0.18) inset;
+        transform: translateY(-2px);
+    }
+    .stock-price { color: #86efac; }
+    .stock-header-icon { width: 16px; height: 16px; }
+    .stock-header {
+        background: rgba(8,15,32,0.95);
+        box-shadow: 0 0 18px rgba(56,189,248,0.35), 0 0 32px rgba(56,189,248,0.2) inset;
+    }
+</style>
+<div class="animate-fade-in">
+    <div class="time-report-surface rounded-3xl p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <h1 class="text-2xl time-report-heading">Stock</h1>
+            <div class="flex flex-wrap items-center gap-3">
+                <form method="get" class="flex flex-wrap items-center gap-2" id="StockSearchForm" asp-action="Stock" asp-controller="Inventory">
+                <input type="hidden" name="viewByLocation" value="@Model.ViewByLocation" />
+                <input type="hidden" name="materialSort" value="@Model.MaterialSort" />
+                <input type="hidden" name="materialSortDir" value="@Model.MaterialSortDir" />
+                <input type="hidden" name="itemSort" value="@Model.ItemSort" />
+                <input type="hidden" name="itemSortDir" value="@Model.ItemSortDir" />
+                <input type="text" name="search" id="StockSearchInput" value="@Model.MaterialSearch" placeholder="Filter materials by name..." class="px-4 py-2 rounded-xl border border-slate-600 bg-slate-900/70 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 min-w-[200px]" autocomplete="off" autofocus />
+                <button type="submit" class="px-4 py-2 rounded-xl text-sm font-medium btn-outline-luminous">Search</button>
+                @if (!string.IsNullOrWhiteSpace(Model.MaterialSearch))
+                {
+                    <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="px-4 py-2 rounded-xl text-sm font-medium btn-outline-luminous">Clear</a>
+                }
+            </form>
+            @if (Model.ViewByLocation)
+            {
+                <a asp-action="Stock" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium btn-outline-luminous">Group by material</a>
+            }
+            else
+            {
+                <a asp-action="Stock" asp-route-viewByLocation="true" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium btn-outline-luminous">View by Location</a>
+            }
+            </div>
+        </div>
+
+    @if (Model.MaterialStockGrouped.Any() || Model.MaterialStock.Any())
+    {
+        <h2 class="text-lg time-report-heading mb-3">Materials</h2>
+        <div class="time-report-panel rounded-2xl overflow-hidden mb-8">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-700 table-fixed w-full text-xs table-report">
+                    <thead class="stock-header">
+                        <tr>
+                            <th class="px-6 py-4 text-center w-3/12 text-xs font-semibold uppercase tracking-wider">
+                                <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="name" asp-route-materialSortDir="@Model.NextMaterialSortDir("name")" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Material<span class="text-cyan-300">@Model.MaterialSortCaret("name")</span></a>
+                            </th>
+                            @if (Model.ViewByLocation)
+                            {
+                                <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold uppercase tracking-wider">
+                                    <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="location" asp-route-materialSortDir="@Model.NextMaterialSortDir("location")" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Location<span class="text-cyan-300">@Model.MaterialSortCaret("location")</span></a>
+                                </th>
+                            }
+                            <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold uppercase tracking-wider">
+                                <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="qty" asp-route-materialSortDir="@Model.NextMaterialSortDir("qty")" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Quantity<span class="text-cyan-300">@Model.MaterialSortCaret("qty")</span></a>
+                            </th>
+                            <th class="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                                <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="min" asp-route-materialSortDir="@Model.NextMaterialSortDir("min")" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Min. stock<span class="text-cyan-300">@Model.MaterialSortCaret("min")</span></a>
+                            </th>
+                            <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold uppercase tracking-wider">
+                                <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="price" asp-route-materialSortDir="@Model.NextMaterialSortDir("price")" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center justify-center gap-2 text-slate-200">
+                                    <svg class="stock-header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 9h.01M11 4h4l5 5v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5z" />
+                                    </svg>
+                                    Unit price
+                                    <span class="text-cyan-300">@Model.MaterialSortCaret("price")</span>
+                                </a>
+                            </th>
+                            <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold uppercase tracking-wider">
+                                <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="value" asp-route-materialSortDir="@Model.NextMaterialSortDir("value")" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Value (€)<span class="text-cyan-300">@Model.MaterialSortCaret("value")</span></a>
+                            </th>
+                            <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold uppercase tracking-wider">
+                                <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="updated" asp-route-materialSortDir="@Model.NextMaterialSortDir("updated")" asp-route-itemSort="@Model.ItemSort" asp-route-itemSortDir="@Model.ItemSortDir" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Updated<span class="text-cyan-300">@Model.MaterialSortCaret("updated")</span></a>
+                            </th>
+                            <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700">
+                        @if (Model.ViewByLocation)
+                        {
+                            @foreach (var s in Model.MaterialStock)
+                            {
+                                var belowMin = s.MinimumStock > 0 && s.TotalQuantityForMaterial < s.MinimumStock;
+                                var materialEditUrl = Url.Page("/Materials/Edit", new { id = s.MaterialId });
+                                <tr class="transition-colors duration-150 cursor-pointer hover:bg-slate-800/40" onclick="window.location.href='@materialEditUrl';">
+                                    <td class="px-6 py-4 text-center w-3/12 font-medium text-white"><a href="@materialEditUrl" class="text-blue-200 hover:underline" onclick="event.stopPropagation();">@s.MaterialName</a></td>
+                                    <td class="px-6 py-4 text-center w-2/12 text-slate-200">@s.LocationCode</td>
+                                    <td class="px-6 py-4 text-center w-1/12 text-slate-200">@s.Quantity</td>
+                                    <td class="px-4 py-4 text-center text-slate-200 whitespace-nowrap" title="Required minimum for this material">@(s.MinimumStock > 0 ? s.MinimumStock.ToString() : "—")</td>
+                                    <td class="px-6 py-4 text-center w-1/12 stock-price">@(s.UnitPrice.HasValue ? s.UnitPrice.Value.ToString("N2") + " €" : "—")</td>
+                                    <td class="px-6 py-4 text-center w-2/12 text-emerald-200">@(s.UnitPrice.HasValue ? (s.Quantity * s.UnitPrice.Value).ToString("N2") + " €" : "—")</td>
+                                    <td class="px-6 py-4 text-center w-2/12 text-slate-200">@s.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td class="px-6 py-4 text-center w-1/12" onclick="event.stopPropagation();">
+                                        <form method="post" asp-action="DeleteMaterialStock" asp-controller="Inventory" class="inline" onsubmit="return confirm('Delete this stock row?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="materialId" value="@s.MaterialId" />
+                                            <input type="hidden" name="locationId" value="@s.LocationId" />
+                                            <input type="hidden" name="viewByLocation" value="@Model.ViewByLocation" />
+                                            <input type="hidden" name="search" value="@Model.MaterialSearch" />
+                                            <input type="hidden" name="materialSort" value="@Model.MaterialSort" />
+                                            <input type="hidden" name="materialSortDir" value="@Model.MaterialSortDir" />
+                                            <input type="hidden" name="itemSort" value="@Model.ItemSort" />
+                                            <input type="hidden" name="itemSortDir" value="@Model.ItemSortDir" />
+                                            <button type="submit" class="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-red-400 text-red-200 text-xs font-medium hover:bg-red-900/40" aria-label="Delete stock row">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" /></svg>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            @foreach (var g in Model.MaterialStockGrouped)
+                            {
+                                var belowMin = g.MinimumStock > 0 && g.TotalQuantity < g.MinimumStock;
+                                var materialEditUrl = Url.Page("/Materials/Edit", new { id = g.MaterialId });
+                                <tr class="transition-colors duration-150 cursor-pointer hover:bg-slate-800/40" onclick="window.location.href='@materialEditUrl';">
+                                    <td class="px-6 py-4 text-center font-medium text-white"><a href="@materialEditUrl" class="text-blue-200 hover:underline" onclick="event.stopPropagation();">@g.MaterialName</a></td>
+                                    <td class="px-6 py-4 text-center text-slate-200">@g.TotalQuantity</td>
+                                    <td class="px-4 py-4 text-center text-slate-200 whitespace-nowrap" title="Required minimum for this material">@(g.MinimumStock > 0 ? g.MinimumStock.ToString() : "—")</td>
+                                    <td class="px-6 py-4 text-center stock-price">@(g.UnitPrice.HasValue ? g.UnitPrice.Value.ToString("N2") + " €" : "—")</td>
+                                    <td class="px-6 py-4 text-center text-emerald-200">@(g.TotalValue.HasValue ? g.TotalValue.Value.ToString("N2") + " €" : "—")</td>
+                                    <td class="px-6 py-4 text-center text-slate-200">@g.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td class="px-6 py-4 text-center" onclick="event.stopPropagation();">
+                                        <form method="post" asp-action="DeleteMaterialStock" asp-controller="Inventory" class="inline" onsubmit="return confirm('Delete all stock rows for this material?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="materialId" value="@g.MaterialId" />
+                                            <input type="hidden" name="viewByLocation" value="@Model.ViewByLocation" />
+                                            <input type="hidden" name="search" value="@Model.MaterialSearch" />
+                                            <input type="hidden" name="materialSort" value="@Model.MaterialSort" />
+                                            <input type="hidden" name="materialSortDir" value="@Model.MaterialSortDir" />
+                                            <input type="hidden" name="itemSort" value="@Model.ItemSort" />
+                                            <input type="hidden" name="itemSortDir" value="@Model.ItemSortDir" />
+                                            <button type="submit" class="inline-flex items-center justify-center w-11 h-11 rounded-xl stock-danger" aria-label="Delete stock row">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" /></svg>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    @{
+                        var grandTotal = Model.MaterialStockGrouped.Where(g => g.TotalValue.HasValue).Sum(g => g.TotalValue!.Value);
+                    }
+                    @if (grandTotal > 0)
+                    {
+                        <tfoot class="bg-slate-900/70">
+                            <tr>
+                                <td class="px-6 py-4 text-center font-semibold text-slate-200" colspan="@(Model.ViewByLocation ? 6 : 5)">Total</td>
+                                <td class="px-6 py-4 text-center font-semibold text-emerald-200">@grandTotal.ToString("N2") €</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+        </div>
+    }
+
+    <h2 class="text-lg time-report-heading mb-3">Items</h2>
+    <div class="time-report-panel rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-700 table-fixed w-full text-xs table-report">
+                <thead class="stock-header">
+                    <tr>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">
+                            <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="sku" asp-route-itemSortDir="@Model.NextItemSortDir("sku")" class="inline-flex items-center justify-center gap-0.5 text-slate-200">SKU<span class="text-cyan-300">@Model.ItemSortCaret("sku")</span></a>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">
+                            <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="item" asp-route-itemSortDir="@Model.NextItemSortDir("item")" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Item<span class="text-cyan-300">@Model.ItemSortCaret("item")</span></a>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">
+                            <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="location" asp-route-itemSortDir="@Model.NextItemSortDir("location")" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Location<span class="text-cyan-300">@Model.ItemSortCaret("location")</span></a>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">
+                            <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="qty" asp-route-itemSortDir="@Model.NextItemSortDir("qty")" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Quantity<span class="text-cyan-300">@Model.ItemSortCaret("qty")</span></a>
+                        </th>
+                        <th class="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                            <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="min" asp-route-itemSortDir="@Model.NextItemSortDir("min")" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Min. stock<span class="text-cyan-300">@Model.ItemSortCaret("min")</span></a>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">
+                            <a asp-action="Stock" asp-route-viewByLocation="@Model.ViewByLocation" asp-route-search="@Model.MaterialSearch" asp-route-materialSort="@Model.MaterialSort" asp-route-materialSortDir="@Model.MaterialSortDir" asp-route-itemSort="updated" asp-route-itemSortDir="@Model.NextItemSortDir("updated")" class="inline-flex items-center justify-center gap-0.5 text-slate-200">Updated<span class="text-cyan-300">@Model.ItemSortCaret("updated")</span></a>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700">
+                    @foreach (var s in Model.ItemStock)
+                    {
+                        int? itemMin = null;
+                        if (s.Item?.Material != null && s.Item.Material.MinimumStock > 0)
+                            itemMin = s.Item.Material.MinimumStock;
+                        var itemBelowMin = itemMin.HasValue && s.Quantity < itemMin.Value;
+                        <tr class="transition-colors duration-150 hover:bg-slate-800/40">
+                            <td class="px-6 py-4 text-center font-medium text-white">@s.Item?.Sku</td>
+                            <td class="px-6 py-4 text-center text-white">@s.Item?.Name</td>
+                            <td class="px-6 py-4 text-center text-slate-200">@s.Location?.Code</td>
+                            <td class="px-6 py-4 text-center text-slate-200">@s.Quantity</td>
+                            <td class="px-4 py-4 text-center text-slate-200 whitespace-nowrap" title="From linked material, if any">@(itemMin.HasValue ? itemMin.Value.ToString() : "—")</td>
+                            <td class="px-6 py-4 text-center text-slate-200">@s.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="px-6 py-4 text-center">
+                                <form method="post" asp-action="DeleteItemStock" asp-controller="Inventory" class="inline" onsubmit="return confirm('Delete this stock row?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="itemId" value="@s.ItemId" />
+                                    <input type="hidden" name="locationId" value="@s.LocationId" />
+                                    <input type="hidden" name="viewByLocation" value="@Model.ViewByLocation" />
+                                    <input type="hidden" name="search" value="@Model.MaterialSearch" />
+                                    <input type="hidden" name="materialSort" value="@Model.MaterialSort" />
+                                    <input type="hidden" name="materialSortDir" value="@Model.MaterialSortDir" />
+                                    <input type="hidden" name="itemSort" value="@Model.ItemSort" />
+                                    <input type="hidden" name="itemSortDir" value="@Model.ItemSortDir" />
+                                    <button type="submit" class="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-red-500 text-red-200 text-xs font-medium hover:bg-red-900/50" aria-label="Delete stock row">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" /></svg>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function() {
+            var form = document.getElementById('StockSearchForm');
+            var input = document.getElementById('StockSearchInput');
+            if (!form || !input) return;
+
+            function norm(s) {
+                return (s || '').toString().trim().toLowerCase();
+            }
+
+            function applyLocalFilter() {
+                var q = norm(input.value);
+
+                // Filter material rows (first table)
+                var materialTable = document.querySelector('h2 + .time-report-panel table');
+                if (materialTable) {
+                    var mRows = materialTable.querySelectorAll('tbody tr');
+                    mRows.forEach(function (tr) {
+                        var text = norm(tr.textContent);
+                        tr.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
+                    });
+                }
+
+                // Filter item rows (second table) - the one after "Items"
+                var itemsHeader = Array.prototype.slice.call(document.querySelectorAll('h2')).find(function (h) {
+                    return norm(h.textContent) === 'items';
+                });
+                if (itemsHeader) {
+                    var itemsCard = itemsHeader.nextElementSibling;
+                    var itemsTable = itemsCard ? itemsCard.querySelector('table') : null;
+                    if (itemsTable) {
+                        var iRows = itemsTable.querySelectorAll('tbody tr');
+                        iRows.forEach(function (tr) {
+                            var text = norm(tr.textContent);
+                            tr.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
+                        });
+                    }
+                }
+            }
+
+            // Local filter as you type (no reload, no focus loss).
+            input.addEventListener('input', function () {
+                applyLocalFilter();
+            });
+
+            // Press Enter to perform server-side search (all pages / full query).
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') return; // allow normal submit
+            });
+
+            // After a GET refresh (Search button/Enter), restore focus and caret at end.
+            window.requestAnimationFrame(function () {
+                try {
+                    input.focus();
+                    var len = (input.value || '').length;
+                    input.setSelectionRange(len, len);
+                } catch (e) { }
+            });
+
+            // Apply local filter on load too (in case search is pre-filled).
+            applyLocalFilter();
+        })();
+    </script>
+}

@@ -1,0 +1,88 @@
+@model ManufacturingTimeTracking.Models.PaginationInfo
+
+@if (Model != null && Model.TotalPages > 0)
+{
+    var query = Context.Request.Query;
+    Func<int, int, string> buildUrl = (page, size) =>
+    {
+        var dict = new Dictionary<string, string>();
+        foreach (var kvp in query)
+        {
+            if (!kvp.Key.Equals("pageNumber", StringComparison.OrdinalIgnoreCase)
+                && !kvp.Key.Equals("pageSize", StringComparison.OrdinalIgnoreCase))
+            {
+                dict[kvp.Key] = kvp.Value.ToString();
+            }
+        }
+        dict["pageNumber"] = page.ToString();
+        dict["pageSize"] = size.ToString();
+        return Context.Request.Path + "?" + string.Join("&", dict.Select(d => $"{d.Key}={Uri.EscapeDataString(d.Value)}"));
+    };
+
+    var totalPages = Model.TotalPages;
+    var current = Model.PageNumber;
+
+    var pages = new List<int>();
+    if (totalPages <= 7)
+    {
+        for (int i = 1; i <= totalPages; i++) pages.Add(i);
+    }
+    else
+    {
+        pages.Add(1);
+        int start = Math.Max(2, current - 1);
+        int end = Math.Min(totalPages - 1, current + 1);
+        if (start > 2) pages.Add(-1);
+        for (int i = start; i <= end; i++) pages.Add(i);
+        if (end < totalPages - 1) pages.Add(-1);
+        pages.Add(totalPages);
+    }
+
+    <div class="flex flex-wrap items-center justify-end gap-2 mt-4 px-4 py-3 text-sm">
+        <span class="text-slate-500 mr-2">@Model.TotalItems items</span>
+
+        @if (Model.HasPreviousPage)
+        {
+            <a href="@buildUrl(current - 1, Model.PageSize)" class="inline-flex items-center justify-center w-8 h-8 rounded border border-slate-200 text-slate-500 hover:border-blue-500 hover:text-blue-500 transition-colors">&lt;</a>
+        }
+        else
+        {
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded border border-slate-100 text-slate-300 cursor-not-allowed">&lt;</span>
+        }
+
+        @foreach (var p in pages)
+        {
+            @if (p == -1)
+            {
+                <span class="inline-flex items-center justify-center w-8 h-8 text-slate-400">...</span>
+            }
+            else if (p == current)
+            {
+                <span class="inline-flex items-center justify-center min-w-[2rem] h-8 px-1.5 rounded border border-blue-500 bg-white text-blue-600 font-medium">@p</span>
+            }
+            else
+            {
+                <a href="@buildUrl(p, Model.PageSize)" class="inline-flex items-center justify-center min-w-[2rem] h-8 px-1.5 rounded border border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500 transition-colors">@p</a>
+            }
+        }
+
+        @if (Model.HasNextPage)
+        {
+            <a href="@buildUrl(current + 1, Model.PageSize)" class="inline-flex items-center justify-center w-8 h-8 rounded border border-slate-200 text-slate-500 hover:border-blue-500 hover:text-blue-500 transition-colors">&gt;</a>
+        }
+        else
+        {
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded border border-slate-100 text-slate-300 cursor-not-allowed">&gt;</span>
+        }
+
+        <div class="relative ml-2">
+            <select onchange="window.location.href=this.value" class="appearance-none pl-3 pr-7 py-1.5 rounded border border-slate-200 text-slate-600 text-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 cursor-pointer bg-white">
+                @foreach (var opt in ManufacturingTimeTracking.Models.PaginationInfo.PageSizeOptions)
+                {
+                    <option value="@buildUrl(1, opt)" selected="@(opt == Model.PageSize)">@opt / page</option>
+                }
+            </select>
+            <span class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">&#9662;</span>
+        </div>
+    </div>
+}

@@ -1,0 +1,58 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.ReopenedStepsModel
+@{
+    ViewData["Title"] = "Reopened Steps";
+}
+
+<div class="animate-fade-in">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h1 class="text-2xl font-bold text-slate-800">Reopened Steps</h1>
+        <a asp-page="./Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">
+            ← Orders
+        </a>
+    </div>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+        <p class="text-slate-500 text-sm mb-4">
+            List of steps that were previously finished and then reopened, including who reopened them, when, and the reason.
+        </p>
+        @if (!Model.Rows.Any())
+        {
+            <p class="text-slate-500 py-4 text-center">No reopened steps recorded yet.</p>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50/80">
+                        <tr>
+                            <th class="px-4 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider text-xs">Date / Time</th>
+                            <th class="px-4 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider text-xs">Order</th>
+                            <th class="px-4 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider text-xs">Step</th>
+                            <th class="px-4 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider text-xs">User</th>
+                            <th class="px-4 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider text-xs">Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var row in Model.Rows)
+                        {
+                            <tr class="hover:bg-slate-50/70">
+                                <td class="px-4 py-2 whitespace-nowrap text-slate-700">@row.ReopenedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="px-4 py-2 text-slate-700">
+                                    @row.OrderRef
+                                    @if (!string.IsNullOrEmpty(row.SerialNumber))
+                                    {
+                                        <span> / @row.SerialNumber</span>
+                                    }
+                                </td>
+                                <td class="px-4 py-2 text-slate-800">@row.StepTitle</td>
+                                <td class="px-4 py-2 text-slate-700">@row.UserEmail</td>
+                                <td class="px-4 py-2 text-slate-700 break-words max-w-xl">@row.Reason</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+

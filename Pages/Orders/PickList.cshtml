@@ -1,0 +1,427 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.PickListModel
+@{
+    ViewData["Title"] = "Pick List";
+}
+
+<div class="animate-fade-in">
+    <div class="flex flex-wrap gap-3 mb-6">
+        <a asp-page="./Details" asp-route-id="@Model.Order.Id" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">← Order details</a>
+        <a asp-page="./Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">Back to orders</a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><dt class="text-sm font-medium text-slate-500">Order</dt><dd class="font-medium text-slate-800">@Model.Order.ExternalRef — @Model.Order.SerialNumber</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Machine model</dt><dd class="font-medium text-slate-800">@Model.MachineModelName</dd></div>
+        </dl>
+    </div>
+
+    @if (Model.Lines.Any() || Model.MaterialSets.Any())
+    {
+        var itemLines = Model.Lines.Where(l => l.ItemId != 0).ToList();
+        var materialLines = Model.Lines.Where(l => l.MaterialId.HasValue && l.ItemId == 0 && (l.ComponentId.HasValue || l.VariantComponentId.HasValue)).ToList();
+        var adHocLines = Model.Lines.Where(l => l.OrderMaterialPickLineId.HasValue).ToList();
+        var materialDisplay = (string name, string? reference) => string.IsNullOrWhiteSpace(reference) ? name : name + " (Ref: " + reference + ")";
+        var manualOptions = itemLines.Select(l => new { kind = "item", value = "i_" + l.ItemId, display = l.Name + (string.IsNullOrEmpty(l.Sku) || l.Sku == "—" ? "" : " (" + l.Sku + ")"), name = l.Name ?? "", sku = l.Sku ?? "", reference = (string?)null })
+            .Concat(materialLines.Select(l => new { kind = "material", value = (l.VariantComponentId.HasValue ? "mv_" + l.VariantComponentId : "mm_" + l.ComponentId), display = materialDisplay(l.Name ?? "", l.MaterialReference), name = l.Name ?? "", sku = "", reference = l.MaterialReference ?? "" }))
+            .Concat(adHocLines.Select(l => new { kind = "adhoc", value = "adhoc_" + l.OrderMaterialPickLineId, display = materialDisplay(l.Name ?? "", l.MaterialReference) + " (set material)", name = l.Name ?? "", sku = "", reference = l.MaterialReference ?? "" }))
+            .Concat(Model.MaterialSets.Select(s => new { kind = "set", value = "set_" + s.Id, display = s.Name + " (" + s.ItemCount + " material(s))", name = s.Name, sku = "", reference = (string?)null }))
+            .ToList();
+        <div class="sticky z-[100] bg-white pb-2 -mx-2 px-2 pt-1 mb-6">
+            <div class="bg-slate-800 rounded-2xl shadow-card overflow-visible">
+                <div class="px-6 py-4 text-white">
+                    <h2 class="text-lg font-semibold">Search</h2>
+                    <p class="text-slate-300 text-sm mt-0.5">Enter or scan: material, material set name, or QR code (tag/SKU). The system will detect the type and add or mark picked.</p>
+                </div>
+                <div class="bg-white px-6 py-4">
+                    <form method="post" asp-page-handler="UnifiedSearch" asp-route-id="@Model.OrderId" class="flex flex-col sm:flex-row gap-3" id="UnifiedSearchForm">
+                        <div class="flex-1 min-w-0 relative">
+                            <input type="text" name="searchValue" id="UnifiedSearchInput" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-slate-600 focus:ring-2 focus:ring-slate-500/20 transition-all" placeholder="Material name, material set, or scan QR / tag / SKU…" autofocus autocomplete="off" />
+                            <input type="hidden" name="selectedValue" id="UnifiedSelectedValue" />
+                            <div id="UnifiedSearchList" class="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-[9999] hidden" role="listbox"></div>
+                        </div>
+                        <button type="submit" class="px-5 py-3 rounded-xl bg-slate-700 text-white font-semibold hover:bg-slate-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap">Add / Mark picked</button>
+                    </form>
+                    <p class="text-slate-500 text-sm mt-2">Material set → adds all materials to the list. Material → adds one or marks picked. QR/tag/SKU → marks that item as picked.</p>
+                </div>
+            </div>
+            <script type="application/json" id="UnifiedSearchData">
+                @Html.Raw(System.Text.Json.JsonSerializer.Serialize(manualOptions))
+            </script>
+        </div>
+    }
+    @if (!Model.Lines.Any())
+    {
+        <div class="p-6 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700">
+            No components are defined for this machine model. Add components in <strong>Catalog → Models → [Model] → Components</strong> to generate pick lists. You can also add a <strong>material set</strong> above.
+        </div>
+    }
+    else
+    {
+        <p class="text-slate-500 text-sm mb-4">List is ordered by warehouse position (zone, then location) so you can walk the shelves in order.</p>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+            <span class="text-sm font-medium text-slate-600">Show:</span>
+            <a asp-page="./PickList" asp-route-id="@Model.OrderId" asp-route-filter="All" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors @(Model.PickingFilter == "All" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">All materials (@Model.Lines.Count)</a>
+            <a asp-page="./PickList" asp-route-id="@Model.OrderId" asp-route-filter="Pending" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors @(Model.PickingFilter == "Pending" ? "bg-amber-600 text-white" : "bg-amber-50 text-amber-800 hover:bg-amber-100")">Pending (@Model.Lines.Count(l => l.QuantityPicked <= 0))</a>
+            <a asp-page="./PickList" asp-route-id="@Model.OrderId" asp-route-filter="PartiallyPicked" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors @(Model.PickingFilter == "PartiallyPicked" ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-800 hover:bg-blue-100")">Partially picked (@Model.Lines.Count(l => l.QuantityPicked > 0 && l.QuantityPicked < l.QuantityNeeded))</a>
+            <a asp-page="./PickList" asp-route-id="@Model.OrderId" asp-route-filter="FullyPicked" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors @(Model.PickingFilter == "FullyPicked" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100")">Fully picked (@Model.Lines.Count(l => l.QuantityPicked >= l.QuantityNeeded))</a>
+        </div>
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 table-fixed w-full">
+                    <thead class="bg-slate-50/80">
+                        <tr>
+                            <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">SKU</th>
+                            <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Model/Type</th>
+                            <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Qty</th>
+                            <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Picked</th>
+                            <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Available</th>
+                            <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Warehouse positions</th>
+                            <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Notes</th>
+                            <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @if (!Model.FilteredLines.Any())
+                        {
+                            <tr>
+                                <td colspan="10" class="px-6 py-8 text-center text-slate-500">No materials match this filter.</td>
+                            </tr>
+                        }
+                        @foreach (var line in Model.FilteredLines)
+                        {
+                            var isMaterialOnly = line.MaterialId.HasValue;
+                            var isPicked = line.QuantityPicked >= line.QuantityNeeded;
+                            var shortSupply = !isMaterialOnly && line.TotalAvailable < line.QuantityNeeded;
+                            var hasAlternatives = line.Alternatives.Any();
+                            var rowBg = isPicked ? "bg-emerald-200 border-l-4 border-emerald-600" : (shortSupply ? "bg-amber-50/80" : (isMaterialOnly ? "bg-slate-50/50" : ""));
+                            <tr class="table-row-hover transition-colors @rowBg">
+                                <td class="px-6 py-4 w-1/12 text-center">
+                                    @if (isMaterialOnly && isPicked)
+                                    {
+                                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Picked</span>
+                                    }
+                                    else if (isMaterialOnly)
+                                    {
+                                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">@line.QuantityPicked / @line.QuantityNeeded</span>
+                                    }
+                                    else if (isPicked)
+                                    {
+                                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Picked</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">@line.QuantityPicked / @line.QuantityNeeded</span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 w-1/12 text-center font-medium text-slate-800">
+                                    @(isMaterialOnly ? "—" : line.Sku)
+                                    @if (hasAlternatives)
+                                    {
+                                        <span class="text-xs text-slate-500 font-normal">(or alternatives)</span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 w-2/12 text-slate-600 text-center">@line.Name</td>
+                                <td class="px-6 py-4 w-1/12 text-slate-600 text-center">@(string.IsNullOrWhiteSpace(line.ModelOrType) ? "—" : line.ModelOrType)</td>
+                                <td class="px-6 py-4 w-1/12 text-slate-600 text-center">@line.QuantityNeeded</td>
+                                <td class="px-6 py-4 w-1/12 font-semibold text-slate-800 text-center">@line.QuantityPicked</td>
+                                <td class="px-6 py-4 w-1/12 text-slate-600 text-center">
+                                    @line.TotalAvailable
+                                    @if (shortSupply && !isPicked)
+                                    {
+                                        <span class="text-red-600 text-xs">(short)</span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 w-2/12 text-slate-600 text-sm text-center">
+                                    @if (line.Locations.Any())
+                                    {
+                                        <ul class="list-none space-y-0.5">
+                                            @foreach (var loc in line.Locations)
+                                            {
+                                                <li><strong>@loc.Code</strong> @(string.IsNullOrEmpty(loc.Zone) ? "" : $"({loc.Zone})") — @loc.Quantity</li>
+                                            }
+                                        </ul>
+                                    }
+                                    @if (hasAlternatives)
+                                    {
+                                        @foreach (var alt in line.Alternatives)
+                                        {
+                                            <div class="mt-2 pt-2 border-t border-slate-200">
+                                                <div class="text-xs text-slate-500 mb-1">OR <strong class="text-slate-700">@alt.Sku</strong> (@alt.Name)</div>
+                                                @if (alt.Locations.Any())
+                                                {
+                                                    <ul class="list-none space-y-0.5 ml-4">
+                                                        @foreach (var loc in alt.Locations)
+                                                        {
+                                                            <li class="text-xs"><strong>@loc.Code</strong> @(string.IsNullOrEmpty(loc.Zone) ? "" : $"({loc.Zone})") — @loc.Quantity</li>
+                                                        }
+                                                    </ul>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-xs text-slate-400 ml-4">No stock</span>
+                                                }
+                                            </div>
+                                        }
+                                    }
+                                    @if (!line.Locations.Any() && !hasAlternatives)
+                                    {
+                                        <span class="text-slate-400">No stock</span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 w-2/12 text-slate-600 text-sm text-center">
+                                    @if (line.OrderMaterialPickLineId.HasValue && line.ComponentId == null)
+                                    {
+                                        <form method="post" asp-page-handler="UpdateAdHocLine" asp-route-id="@Model.OrderId" class="inline-flex items-center justify-center gap-1">
+                                            <input type="hidden" name="orderMaterialPickLineId" value="@line.OrderMaterialPickLineId.Value" />
+                                            <label class="text-xs text-slate-500">Qty:</label>
+                                            <input type="number" name="quantityRequired" value="@line.QuantityNeeded" min="0" class="w-16 px-2 py-1 rounded border border-slate-300 text-xs text-center" />
+                                            <button type="submit" class="inline-flex items-center px-2 py-1 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50">
+                                                Save
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        @(line.Notes ?? "—")
+                                    }
+                                </td>
+                                <td class="px-6 py-4 w-1/12 text-center">
+                                    @if (line.MaterialId.HasValue)
+                                    {
+                                        <div class="inline-flex items-center gap-1">
+                                            @if (line.QuantityPicked < line.QuantityNeeded)
+                                            {
+                                                <form method="post" asp-page-handler="IncrementPicked" asp-route-id="@Model.OrderId" class="inline">
+                                                    @if (line.OrderMaterialPickLineId.HasValue)
+                                                    {
+                                                        <input type="hidden" name="orderMaterialPickLineId" value="@line.OrderMaterialPickLineId.Value" />
+                                                    }
+                                                    @if (line.ComponentId.HasValue && !line.OrderMaterialPickLineId.HasValue)
+                                                    {
+                                                        <input type="hidden" name="componentId" value="@line.ComponentId.Value" />
+                                                    }
+                                                    <button type="submit" class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold text-lg leading-none" title="Add 1 (deduct from inventory)">+</button>
+                                                </form>
+                                            }
+                                            @if (line.QuantityPicked > 0 && line.OrderMaterialPickLineId.HasValue)
+                                            {
+                                                <form method="post" asp-page-handler="DecrementPicked" asp-route-id="@Model.OrderId" class="inline">
+                                                    <input type="hidden" name="orderMaterialPickLineId" value="@line.OrderMaterialPickLineId!.Value" />
+                                                    <button type="submit" class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 font-semibold text-lg leading-none" title="Subtract 1 (return to inventory)">−</button>
+                                                </form>
+                                            }
+                                        </div>
+                                    }
+                                    else if (line.ItemId != 0)
+                                    {
+                                        <div class="inline-flex items-center gap-1">
+                                            @if (line.QuantityPicked < line.QuantityNeeded)
+                                            {
+                                                <form method="post" asp-page-handler="IncrementItemPicked" asp-route-id="@Model.OrderId" class="inline">
+                                                    <input type="hidden" name="itemId" value="@line.ItemId" />
+                                                    <button type="submit" class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold text-lg leading-none" title="Add 1 (deduct from inventory)">+</button>
+                                                </form>
+                                            }
+                                            @if (line.QuantityPicked > 0)
+                                            {
+                                                <form method="post" asp-page-handler="DecrementItemPicked" asp-route-id="@Model.OrderId" class="inline">
+                                                    <input type="hidden" name="itemId" value="@line.ItemId" />
+                                                    <button type="submit" class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 font-semibold text-lg leading-none" title="Subtract 1 (return to inventory)">−</button>
+                                                </form>
+                                            }
+                                        </div>
+                                    }
+                                    @if (line.OrderMaterialPickLineId.HasValue && line.ComponentId == null)
+                                    {
+                                        <form method="post" asp-page-handler="DeleteAdHocLine" asp-route-id="@Model.OrderId" class="inline ml-1">
+                                            <input type="hidden" name="orderMaterialPickLineId" value="@line.OrderMaterialPickLineId.Value" />
+                                            <button type="submit" class="inline-flex items-center px-2 py-1 rounded-lg border border-red-200 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        var pickableLines = Model.Lines.ToList();
+        var allPicked = pickableLines.Count > 0 && pickableLines.All(l => l.QuantityPicked >= l.QuantityNeeded);
+        if (allPicked)
+        {
+            <div class="mt-6 p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium">
+                All components picked. You have the complete spare parts for this machine.
+            </div>
+        }
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var form  = document.getElementById('UnifiedSearchForm');
+            var input = document.getElementById('UnifiedSearchInput');
+            var hidden = document.getElementById('UnifiedSelectedValue');
+            var listEl = document.getElementById('UnifiedSearchList');
+            var dataEl = document.getElementById('UnifiedSearchData');
+            if (!input || !hidden || !listEl || !dataEl || !form) return;
+
+            var options = [];
+            try { options = JSON.parse(dataEl.textContent || '[]'); } catch (e) { options = []; }
+
+            // ── Scanner detection ──────────────────────────────────────────────
+            // A barcode/QR scanner pastes all characters in < ~50 ms per char.
+            // We track the time between consecutive 'input' events; if the last
+            // burst was fast enough we treat it as a scan and auto-submit.
+            var lastInputAt = 0;
+            var scanBuffer  = [];        // timestamps of recent input events
+            var scanTimer   = null;
+            var SCAN_SPEED_MS = 50;      // max ms between chars to count as scanner
+            var SCAN_MIN_LEN  = 4;       // minimum chars to consider it a scan
+            var SCAN_SETTLE_MS = 120;    // ms of silence after which we decide it's done
+
+            function isScannerBurst() {
+                if (scanBuffer.length < SCAN_MIN_LEN) return false;
+                // All gaps between consecutive events must be <= SCAN_SPEED_MS
+                for (var i = 1; i < scanBuffer.length; i++) {
+                    if (scanBuffer[i] - scanBuffer[i - 1] > SCAN_SPEED_MS) return false;
+                }
+                return true;
+            }
+
+            function submitAsQr() {
+                hideList();
+                hidden.value = '';          // send raw text, not a selectedValue
+                form.submit();
+            }
+
+            // ── Autocomplete ──────────────────────────────────────────────────
+            var focusedIdx = -1;
+
+            function showList(filter) {
+                focusedIdx = -1;
+                var q = (filter != null ? filter : input.value).trim().toLowerCase();
+                var filtered = !q ? options : options.filter(function (o) {
+                    return (o.display || '').toLowerCase().indexOf(q) !== -1
+                        || (o.name  || '').toLowerCase().indexOf(q) !== -1
+                        || (o.sku   || '').toLowerCase().indexOf(q) !== -1
+                        || (o.reference || '').toLowerCase().indexOf(q) !== -1;
+                });
+                listEl.innerHTML = '';
+                if (!filtered.length) { listEl.classList.add('hidden'); return; }
+                listEl.classList.remove('hidden');
+                filtered.forEach(function (o) {
+                    var div = document.createElement('div');
+                    div.setAttribute('role', 'option');
+                    div.className = 'px-4 py-2.5 cursor-pointer hover:bg-blue-50 text-slate-800 border-b border-slate-100 last:border-0';
+                    div.textContent = o.display;
+                    div.dataset.value = o.value;
+                    div.addEventListener('mousedown', function (e) {
+                        // mousedown fires before blur; prevent blur from hiding list first
+                        e.preventDefault();
+                    });
+                    div.addEventListener('click', function () {
+                        hidden.value = this.dataset.value;
+                        input.value  = this.textContent;
+                        hideList();
+                        input.focus();
+                        // Auto-submit when a suggestion is clicked
+                        form.submit();
+                    });
+                    listEl.appendChild(div);
+                });
+            }
+
+            function hideList() {
+                listEl.classList.add('hidden');
+                focusedIdx = -1;
+                // Remove highlight from all items
+                Array.prototype.forEach.call(listEl.children, function (el) {
+                    el.classList.remove('bg-blue-50');
+                });
+            }
+
+            function moveFocus(delta) {
+                var items = listEl.querySelectorAll('[role="option"]');
+                if (!items.length) return;
+                if (focusedIdx >= 0 && focusedIdx < items.length)
+                    items[focusedIdx].classList.remove('bg-blue-50');
+                focusedIdx = Math.max(0, Math.min(focusedIdx + delta, items.length - 1));
+                items[focusedIdx].classList.add('bg-blue-50');
+                items[focusedIdx].scrollIntoView({ block: 'nearest' });
+            }
+
+            function confirmFocused() {
+                var items = listEl.querySelectorAll('[role="option"]');
+                if (focusedIdx >= 0 && focusedIdx < items.length) {
+                    items[focusedIdx].click();
+                    return true;
+                }
+                return false;
+            }
+
+            // ── Events ────────────────────────────────────────────────────────
+            input.addEventListener('focus', function () {
+                hidden.value = '';
+                scanBuffer = [];
+                showList();
+            });
+
+            input.addEventListener('input', function () {
+                hidden.value = '';
+
+                // Track timing for scanner detection
+                var now = Date.now();
+                if (now - lastInputAt > 500) scanBuffer = []; // reset after long pause
+                scanBuffer.push(now);
+                lastInputAt = now;
+
+                // Cancel any pending auto-submit
+                if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+
+                // After SCAN_SETTLE_MS of silence, check if this was a scan
+                scanTimer = setTimeout(function () {
+                    scanTimer = null;
+                    if (isScannerBurst() && input.value.trim().length >= SCAN_MIN_LEN) {
+                        submitAsQr();
+                    }
+                }, SCAN_SETTLE_MS);
+
+                showList(this.value);
+            });
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    hideList();
+                    this.blur();
+                    return;
+                }
+                if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus(1);  return; }
+                if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); return; }
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+                    // If user highlighted a suggestion → confirm it
+                    if (!confirmFocused()) {
+                        // Otherwise submit the raw text (QR / SKU path)
+                        hideList();
+                        hidden.value = '';
+                        form.submit();
+                    }
+                }
+            });
+
+            document.addEventListener('click', function (e) {
+                if (e.target !== input && e.target !== listEl && !listEl.contains(e.target))
+                    hideList();
+            });
+        })();
+    </script>
+}
+

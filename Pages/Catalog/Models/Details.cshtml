@@ -1,0 +1,277 @@
+@page
+@model ManufacturingTimeTracking.Pages.Catalog.Models.DetailsModel
+@{
+    ViewData["Title"] = "Model Details";
+}
+
+<div class="animate-fade-in w-full">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Model Details</h1>
+    <p class="text-slate-500 mb-6">Machine model, variants, and components.</p>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-slate-700 mb-4">Machine Model</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><dt class="text-sm font-medium text-slate-500">@Html.DisplayNameFor(model => model.MachineModel.Name)</dt><dd class="font-medium text-slate-800">@Html.DisplayFor(model => model.MachineModel.Name)</dd></div>
+        </dl>
+        <div class="mt-4">
+            <dt class="text-sm font-medium text-slate-500 mb-2">Variants</dt>
+            <dd>
+                @if (Model.MachineModel.Variants.Any())
+                {
+                    <ul class="space-y-2">
+                        @foreach (var variant in Model.MachineModel.Variants)
+                        {
+                            <li class="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-slate-50">
+                                <span class="font-medium text-slate-800">@variant.Name (@variant.Code)</span>
+                                <a asp-page="/Catalog/Variants/Details" asp-route-id="@variant.Id" class="text-sm px-3 py-1 rounded-lg border border-slate-600 text-slate-700 hover:bg-slate-100">Materials</a>
+                                <button type="button" class="text-sm px-3 py-1 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50" onclick="editVariant(@variant.Id, '@variant.Name.Replace("'", "\\'")', '@variant.Code.Replace("'", "\\'")')">Edit</button>
+                                <form method="post" asp-page-handler="DeleteVariant" class="inline">
+                                    <input type="hidden" name="variantId" value="@variant.Id" />
+                                    <input type="hidden" name="modelId" value="@Model.MachineModel.Id" />
+                                    <button type="submit" class="text-sm px-3 py-1 rounded-lg border border-red-600 text-red-600 hover:bg-red-50" onclick="return confirm('Are you sure you want to delete variant @variant.Name?');">Delete</button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <span class="text-slate-500">No variants</span>
+                }
+            </dd>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <h3 class="text-lg font-semibold text-slate-700 mb-3">Add New Variant</h3>
+        <form method="post" asp-page-handler="AddVariant" asp-route-id="@Model.MachineModel.Id" class="flex flex-wrap gap-4 items-end">
+            <div asp-validation-summary="All" class="w-full text-red-600 text-sm"></div>
+            <input type="hidden" asp-for="NewVariant.MachineModelId" value="@Model.MachineModel.Id" />
+            <div class="min-w-[140px]">
+                <label asp-for="NewVariant.Name" class="block text-sm font-medium text-slate-700 mb-1">Name <span class="text-red-500">*</span></label>
+                <input asp-for="NewVariant.Name" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required />
+                <span asp-validation-for="NewVariant.Name" class="text-red-600 text-sm"></span>
+            </div>
+            <div class="min-w-[120px]">
+                <label asp-for="NewVariant.Code" class="block text-sm font-medium text-slate-700 mb-1">Code <span class="text-red-500">*</span></label>
+                <input asp-for="NewVariant.Code" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required />
+                <span asp-validation-for="NewVariant.Code" class="text-red-600 text-sm"></span>
+            </div>
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md">Add Variant</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <h3 class="text-lg font-semibold text-slate-700 mb-1">Components (spare parts)</h3>
+        <p class="text-slate-500 text-sm mb-4">Used to generate pick lists when creating a new order. Add motors, sensors, PCs, etc.</p>
+        @if (Model.MachineModel.Components.Any())
+        {
+            <div class="overflow-x-auto rounded-xl border border-slate-100">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50/80"><tr><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Material</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Qty</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Alternatives</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Notes</th><th class="px-4 py-3"></th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var c in Model.MachineModel.Components.OrderBy(c => c.Material != null ? c.Material.Name : c.Item != null ? c.Item.Sku : ""))
+                        {
+                            <tr class="table-row-hover">
+                                <td class="px-4 py-3 text-slate-800 font-medium">@(c.Material != null ? c.Material.Name : c.Item != null ? c.Item.Name + " (" + c.Item.Sku + ")" : "—")</td>
+                                <td class="px-4 py-3 text-slate-600">@c.Quantity</td>
+                                <td class="px-4 py-3 text-slate-600 text-sm">
+                                    @if (c.ItemId.HasValue && c.Alternatives.Any())
+                                    {
+                                        <div class="space-y-1">
+                                            @foreach (var alt in c.Alternatives.OrderBy(a => a.SortOrder).ThenBy(a => a.Item.Sku))
+                                            {
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-slate-400">OR</span>
+                                                    <span class="font-medium">@alt.Item.Sku</span>
+                                                    <span class="text-slate-500">(@alt.Item.Name)</span>
+                                                    <form method="post" asp-page-handler="DeleteAlternative" class="inline" onsubmit="return confirm('Remove this alternative?');">
+                                                        <input type="hidden" name="alternativeId" value="@alt.Id" />
+                                                        <input type="hidden" name="modelId" value="@Model.MachineModel.Id" />
+                                                        <button type="submit" class="text-xs text-red-600 hover:text-red-800" title="Remove alternative">×</button>
+                                                    </form>
+                                                </div>
+                                            }
+                                        </div>
+                                        <button type="button" class="mt-2 text-xs px-2 py-1 rounded border border-blue-600 text-blue-600 hover:bg-blue-50" onclick="showAddAlternative(@c.Id)">+ Add alternative</button>
+                                    }
+                                    else if (c.ItemId.HasValue)
+                                    {
+                                        <button type="button" class="text-xs px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-50" onclick="showAddAlternative(@c.Id)">+ Add alternatives</button>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-slate-400">—</span>
+                                    }
+                                </td>
+                                <td class="px-4 py-3 text-slate-500">@(c.Notes ?? "—")</td>
+                                <td class="px-4 py-3">
+                                    <form method="post" asp-page-handler="DeleteComponent" class="inline">
+                                        <input type="hidden" name="componentId" value="@c.Id" />
+                                        <input type="hidden" name="modelId" value="@Model.MachineModel.Id" />
+                                        <button type="submit" class="text-sm px-3 py-1 rounded-lg border border-red-600 text-red-600 hover:bg-red-50" onclick="return confirm('Remove this component?');">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p class="text-slate-500 text-sm mb-4">No components defined. Add materials below to build the list for pick lists.</p>
+        }
+        <form method="post" asp-page-handler="AddComponent" asp-route-id="@Model.MachineModel.Id" class="flex flex-wrap gap-4 items-end mt-4">
+            <div class="min-w-[220px] relative">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
+                <input type="text" id="MaterialComponentInput" placeholder="Type to filter material…" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" autocomplete="off" />
+                <input type="hidden" asp-for="NewComponentMaterialId" id="NewComponentMaterialId" />
+                <div id="MaterialComponentList" class="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-50 hidden" role="listbox"></div>
+                <script type="application/json" id="MaterialComponentData">@Html.Raw(Model.MaterialListJson)</script>
+            </div>
+            <div class="w-20">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Qty</label>
+                <input asp-for="NewComponentQuantity" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" type="number" min="1" />
+            </div>
+            <div class="min-w-[140px]">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+                <input asp-for="NewComponentNotes" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Optional" />
+            </div>
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md">Add component</button>
+        </form>
+    </div>
+
+    <div class="flex gap-3">
+    <div class="m-auto">
+        <a asp-page="./Edit" asp-route-id="@Model.MachineModel.Id" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md">Edit</a>
+        <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Back to List</a>
+    </div>
+    </div>
+</div>
+
+<!-- Edit Variant Modal (Tailwind) -->
+<div id="editVariantModal" class="fixed inset-0 z-50 hidden flex items-center justify-center" aria-hidden="true">
+    <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeEditVariantModal()"></div>
+    <div class="relative w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 p-6 animate-scale-in">
+        <h4 class="text-lg font-semibold text-slate-800 mb-4">Edit Variant</h4>
+        <form method="post" asp-page-handler="UpdateVariant">
+            <input type="hidden" id="editVariantId" name="variantId" />
+            <input type="hidden" name="modelId" value="@Model.MachineModel.Id" />
+            <div class="space-y-4">
+                <div>
+                    <label for="editVariantName" class="block text-sm font-medium text-slate-700 mb-1">Name <span class="text-red-500">*</span></label>
+                    <input type="text" id="editVariantName" name="name" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required />
+                </div>
+                <div>
+                    <label for="editVariantCode" class="block text-sm font-medium text-slate-700 mb-1">Code <span class="text-red-500">*</span></label>
+                    <input type="text" id="editVariantCode" name="code" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required />
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+            <div class="m-auto">
+                <button type="button" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50" onclick="closeEditVariantModal()">Cancel</button>
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Save Changes</button>
+            </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Alternative Modal -->
+<div id="addAlternativeModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeAddAlternativeModal()"></div>
+    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 p-6 animate-scale-in">
+        <h4 class="text-lg font-semibold text-slate-800 mb-4">Add Alternative Item</h4>
+        <p class="text-slate-500 text-sm mb-4">Add an alternative item that can be used instead of the primary item. Pick list will show all alternatives.</p>
+        <form method="post" asp-page-handler="AddAlternative">
+            <input type="hidden" id="addAlternativeComponentId" name="componentId" />
+            <input type="hidden" name="modelId" value="@Model.MachineModel.Id" />
+            <div class="space-y-4">
+                <div>
+                    <label for="addAlternativeItemId" class="block text-sm font-medium text-slate-700 mb-1">Alternative Item <span class="text-red-500">*</span></label>
+                    <select id="addAlternativeItemId" name="itemId" asp-items="Model.ItemSelectList" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required>
+                        <option value="">-- Select item --</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button type="button" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50" onclick="closeAddAlternativeModal()">Cancel</button>
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Add Alternative</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        function editVariant(id, name, code) {
+            document.getElementById('editVariantId').value = id;
+            document.getElementById('editVariantName').value = name;
+            document.getElementById('editVariantCode').value = code;
+            document.getElementById('editVariantModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeEditVariantModal() {
+            document.getElementById('editVariantModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        function showAddAlternative(componentId) {
+            document.getElementById('addAlternativeComponentId').value = componentId;
+            document.getElementById('addAlternativeItemId').value = '';
+            document.getElementById('addAlternativeModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeAddAlternativeModal() {
+            document.getElementById('addAlternativeModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // Material combobox: type to filter, click to select
+        (function() {
+            var input = document.getElementById('MaterialComponentInput');
+            var hidden = document.getElementById('NewComponentMaterialId');
+            var listEl = document.getElementById('MaterialComponentList');
+            var dataEl = document.getElementById('MaterialComponentData');
+            if (!input || !hidden || !listEl || !dataEl) return;
+            var materials = [];
+            try { materials = JSON.parse(dataEl.textContent || '[]'); } catch (e) {}
+
+            function showList(filter) {
+                var q = (filter != null ? filter : input.value || '').trim().toLowerCase();
+                var filtered = !q ? materials : materials.filter(function(m) { return (m.Name || '').toLowerCase().indexOf(q) !== -1; });
+                listEl.innerHTML = '';
+                listEl.classList.remove('hidden');
+                filtered.forEach(function(m) {
+                    var div = document.createElement('div');
+                    div.setAttribute('role', 'option');
+                    div.className = 'px-4 py-2.5 cursor-pointer hover:bg-blue-50 text-slate-800 border-b border-slate-100 last:border-0';
+                    div.textContent = m.Name || '';
+                    div.dataset.id = m.Id;
+                    div.dataset.name = m.Name || '';
+                    div.addEventListener('click', function() {
+                        hidden.value = this.dataset.id;
+                        input.value = this.dataset.name;
+                        listEl.classList.add('hidden');
+                        input.focus();
+                    });
+                    listEl.appendChild(div);
+                });
+            }
+            function hideList() { listEl.classList.add('hidden'); }
+
+            input.addEventListener('focus', function() { showList(); });
+            input.addEventListener('input', function() {
+                if (!this.value.trim()) hidden.value = '';
+                showList(this.value);
+            });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { hideList(); this.blur(); }
+            });
+            document.addEventListener('click', function(e) {
+                if (e.target !== input && e.target !== listEl && !listEl.contains(e.target)) hideList();
+            });
+        })();
+    </script>
+}

@@ -1,0 +1,87 @@
+@page
+@model ManufacturingTimeTracking.Pages.TimeTracking.BreakReasons.IndexModel
+@{
+    ViewData["Title"] = "Break Reasons";
+}
+
+<div class="animate-fade-in max-w-3xl mx-auto">
+    <div class="mb-6">
+        <a asp-page="../Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">← Time Tracking</a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <h1 class="text-2xl font-bold text-slate-800 mb-1">Break Reasons</h1>
+        <p class="text-slate-500 text-sm mb-6">Configure reasons shown when employees start a break. Inactive reasons are hidden from the Time Tracking screen.</p>
+
+        @if (Model.Message != null)
+        {
+            <div class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">@Model.Message</div>
+        }
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm">@Model.ErrorMessage</div>
+        }
+
+        <form method="post" asp-page-handler="Create" class="flex flex-wrap items-end gap-3 mb-6 p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <div class="flex-1 min-w-[140px]">
+                <label asp-for="CreateInput.Name" class="block text-xs font-medium text-slate-500 mb-1">Name</label>
+                <input asp-for="CreateInput.Name" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="e.g. Lunch" />
+                <span asp-validation-for="CreateInput.Name" class="text-red-600 text-xs"></span>
+            </div>
+            <div class="flex-1 min-w-[180px]">
+                <label asp-for="CreateInput.Description" class="block text-xs font-medium text-slate-500 mb-1">Description (optional)</label>
+                <input asp-for="CreateInput.Description" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Short description" />
+            </div>
+            <div class="flex items-center gap-2">
+                <input asp-for="CreateInput.Active" type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                <label asp-for="CreateInput.Active" class="text-sm text-slate-600">Active</label>
+            </div>
+            <button type="submit" class="px-4 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Add reason</button>
+        </form>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50/80">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Active</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var r in Model.BreakReasons)
+                    {
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-4 py-3 font-medium text-slate-800">@r.Name</td>
+                            <td class="px-4 py-3 text-slate-600 text-sm">@(r.Description ?? "—")</td>
+                            <td class="px-4 py-3 text-center">
+                                @if (r.Active)
+                                {
+                                    <span class="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Yes</span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-600">No</span>
+                                }
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <a asp-page="./Edit" asp-route-id="@r.Id" class="inline-flex px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 text-sm font-medium hover:bg-blue-50 mr-2">Edit</a>
+                                <form method="post" asp-page-handler="ToggleActive" asp-route-id="@r.Id" class="inline">
+                                    <button type="submit" class="inline-flex px-3 py-1.5 rounded-lg border border-slate-400 text-slate-700 text-sm font-medium hover:bg-slate-50">@(r.Active ? "Disable" : "Enable")</button>
+                                </form>
+                                <form method="post" asp-page-handler="Delete" asp-route-id="@r.Id" class="inline" onsubmit="return confirm('Delete this break reason?');">
+                                    <button type="submit" class="inline-flex px-3 py-1.5 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (!Model.BreakReasons.Any())
+        {
+            <p class="text-slate-500 text-sm py-4">No break reasons yet. Add one above.</p>
+        }
+    </div>
+</div>

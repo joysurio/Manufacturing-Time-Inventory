@@ -1,0 +1,117 @@
+@page
+@model ManufacturingTimeTracking.Pages.Tasks.IndexModel
+@using ManufacturingTimeTracking.Models.Tasks
+@{
+    ViewData["Title"] = "Tasks";
+    string StatusText(TaskItemStatus s) => s switch { TaskItemStatus.Open => "Open", TaskItemStatus.InProgress => "In progress", TaskItemStatus.Finished => "Finished", _ => s.ToString() };
+    string StatusClass(TaskItemStatus s) => s switch { TaskItemStatus.Open => "bg-slate-100 text-slate-800", TaskItemStatus.InProgress => "bg-amber-100 text-amber-800", TaskItemStatus.Finished => "bg-emerald-100 text-emerald-800", _ => "" };
+}
+
+<style>
+    .page-dark { background: #050915; color: #f8fafc; font-weight: 300; }
+    .card-dark {
+        background: rgba(10,15,31,0.92);
+        border: 1px solid rgba(59,130,246,0.45);
+        box-shadow: 0 0 24px rgba(59,130,246,0.28), 0 0 48px rgba(59,130,246,0.18);
+        border-radius: 18px;
+    }
+    .btn-glow {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+        background: #0b1224;
+        color: #f8fafc;
+    }
+    .table-dark thead { background: rgba(30,41,59,0.75); }
+    .table-dark th { color: #cbd5e1; }
+    .table-dark td { color: #e2e8f0; }
+    .table-dark tr:hover { background: rgba(51,65,85,0.35); }
+    .badge-open { background: rgba(100,116,139,0.35); color: #e2e8f0; }
+    .badge-inprogress { background: rgba(245,158,11,0.2); color: #fcd34d; }
+    .badge-finished { background: rgba(16,185,129,0.2); color: #a7f3d0; }
+</style>
+
+<div class="animate-fade-in page-dark">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-semibold text-white">Tasks</h1>
+        <a asp-page="Create" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl btn-glow font-medium hover:bg-slate-900 transition-all duration-200 w-fit">Create task</a>
+    </div>
+    <p class="text-slate-200 mb-6">Internal tasks not linked to orders (e.g. cleaning, customer visit, maintenance). Assign and track time spent.</p>
+
+    <form method="get" class="mb-6 flex flex-wrap gap-2 items-center">
+        <label class="text-sm font-medium text-slate-200">Show:</label>
+        @{
+            var filterVal = Model.Filter ?? "All";
+        }
+        <select name="Filter" class="px-4 py-2.5 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30" onchange="this.form.submit()">
+            @if (filterVal == "All") { <option value="All" selected>All tasks</option> } else { <option value="All">All tasks</option> }
+            @if (filterVal == "Open") { <option value="Open" selected>Open</option> } else { <option value="Open">Open</option> }
+            @if (filterVal == "InProgress") { <option value="InProgress" selected>In progress</option> } else { <option value="InProgress">In progress</option> }
+            @if (filterVal == "Finished") { <option value="Finished" selected>Finished</option> } else { <option value="Finished">Finished</option> }
+        </select>
+    </form>
+
+    <div class="card-dark overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-700 table-dark">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase">Title</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase">Assigned to</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase">Status</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase">Time spent</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    @foreach (var t in Model.Tasks)
+                    {
+                        <tr class="transition-colors duration-150">
+                            <td class="px-6 py-4 text-center">
+                                <a asp-page="Detail" asp-route-id="@t.Id" class="font-medium text-white hover:text-blue-300">@t.Title</a>
+                                @if (!string.IsNullOrWhiteSpace(t.Description))
+                                {
+                                    <p class="text-sm text-slate-300 truncate max-w-xs">@t.Description</p>
+                                }
+                            </td>
+                            <td class="px-6 py-4 text-slate-200 text-center">@t.AssignedUserName</td>
+                            <td class="px-6 py-4 text-center">
+                                @{ var badgeClass = t.Status switch { TaskItemStatus.Open => "badge-open", TaskItemStatus.InProgress => "badge-inprogress", TaskItemStatus.Finished => "badge-finished", _ => "" }; }
+                                <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium @badgeClass">@StatusText(t.Status)</span>
+                            </td>
+                            <td class="px-6 py-4 text-slate-200 text-center">@FormatDuration(t.TotalTimeSpent)
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <div class="inline-flex gap-2 flex-wrap justify-end">
+                                    <a asp-page="Detail" asp-route-id="@t.Id" class="inline-flex px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-slate-900">Open</a>
+                                    @if (t.Status == TaskItemStatus.Finished)
+                                    {
+                                        <form method="post" asp-page-handler="Reopen" asp-route-id="@t.Id" class="inline">
+                                            <button type="submit" class="inline-flex px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-slate-900">
+                                                Reopen
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (!Model.Tasks.Any())
+        {
+            <p class="text-slate-300 py-8 text-center">No tasks match the filter. <a asp-page="Create" class="text-blue-300 hover:underline">Create a task</a>.</p>
+        }
+    </div>
+</div>
+
+@functions {
+    static string FormatDuration(TimeSpan t)
+    {
+        if (t.TotalHours >= 1)
+            return $"{(int)t.TotalHours}h {t.Minutes}m";
+        if (t.TotalMinutes >= 1)
+            return $"{t.Minutes}m";
+        return t.TotalSeconds > 0 ? $"{t.Seconds}s" : "—";
+    }
+}

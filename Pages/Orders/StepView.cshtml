@@ -1,0 +1,622 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.StepViewModel
+@{
+    ViewData["Title"] = "Step: " + Model.StepExec.Title;
+    Layout = null; // Full screen, no layout
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .step-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: white;
+        }
+        .media-sidebar {
+            width: 25%;
+            background: #1a1a1a;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .step-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .step-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .video-container {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        .video-container video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .image-container {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .evidence-item {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 8px;
+            color: white;
+            margin-bottom: 10px;
+        }
+        .evidence-item small {
+            color: #aaa;
+        }
+        .timer-display {
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            color: #667eea;
+            margin: 20px 0;
+        }
+        .timer-display .timer-box span { display:block; font-size: inherit; font-weight: bold; color: inherit; }
+        .timer-display .timer-label { margin-bottom: 4px; }
+
+        /* Timer/Target box styling */
+        .timer-target-row { gap: 1.5rem; }
+        .timer-box { min-width: 220px; padding: 10px 18px; border-radius: 12px; border: 2px solid rgba(15,23,42,0.06); background: #f8fafc; color: #0f172a; box-shadow: 0 6px 18px rgba(2,6,23,0.06); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        .timer-box .timer-label { font-size:0.9rem; color:#2563eb; font-weight:700; margin-bottom:6px; }
+        .timer-box .timer-value { font-size:3rem; line-height:1; }
+
+        /* Box alarm outlines */
+        .alarm-orange-box { border-color: #ff8c00 !important; box-shadow: 0 8px 30px rgba(255,140,0,0.12) !important; }
+        .alarm-red-box { border-color: #ff0000 !important; box-shadow: 0 10px 36px rgba(255,0,0,0.12) !important; }
+        /* Alarm styles for timer text */
+        .alarm-orange { animation: pulse-orange 1s infinite; color: #ff8c00 !important; }
+        .alarm-red { animation: pulse-red 0.6s infinite; color: #ff0000 !important; }
+
+        /* Strong visual alarm on header and content */
+        .alarm-orange-bg { animation: pulse-orange-bg 1s infinite; background: linear-gradient(90deg,#ffedd5,#fff7ed) !important; color: #7c2d12 !important; }
+        .alarm-red-bg { animation: pulse-red-bg 0.6s infinite; background: linear-gradient(90deg,#fee2e2,#fff1f2) !important; color: #7f1d1d !important; }
+        @@keyframes pulse-orange-bg { 0% { box-shadow: 0 0 0 0 rgba(255,140,0,0.12);} 50% { box-shadow: 0 0 40px 18px rgba(255,140,0,0.06);} 100% { box-shadow: 0 0 0 0 rgba(255,140,0,0);} }
+        @@keyframes pulse-red-bg { 0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.18);} 50% { box-shadow: 0 0 56px 22px rgba(255,0,0,0.08);} 100% { box-shadow: 0 0 0 0 rgba(255,0,0,0);} }
+        @@keyframes pulse-orange { 0% { box-shadow: 0 0 0 0 rgba(255,140,0,0.6);} 70% { box-shadow: 0 0 30px 10px rgba(255,140,0,0.08);} 100% { box-shadow: 0 0 0 0 rgba(255,140,0,0);} }
+        @@keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.8);} 50% { box-shadow: 0 0 40px 14px rgba(255,0,0,0.12);} 100% { box-shadow: 0 0 0 0 rgba(255,0,0,0);} }
+        .action-buttons {
+            position: fixed;
+            bottom: 20px;
+            right: calc(25% + 20px);
+            display: flex;
+            gap: 10px;
+        }
+        .btn-fullscreen {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+        .btn-fullscreen:hover {
+            background: #5568d3;
+        }
+        .close-btn {
+            position: fixed;
+            top: 20px;
+            right: calc(25% + 20px);
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .close-btn:hover {
+            background: rgba(0,0,0,0.7);
+        }
+        .img-thumbnail:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+            transition: all 0.3s ease;
+        }
+        #imageModal .modal-dialog {
+            max-width: 90vw;
+        }
+        #imageModal .modal-body img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="step-container">
+        <!-- Main Content Area (75%) -->
+        <div class="main-content">
+            <button class="close-btn" onclick="window.close()" title="Close">×</button>
+            
+            <div class="step-header">
+                <h1>@Model.StepExec.Title</h1>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        <span class="badge bg-light text-dark me-2">Step @Model.StepExec.SortOrder</span>
+                        <span class="badge bg-@(Model.StepExec.State == "InProgress" ? "primary" : Model.StepExec.State == "Done" ? "success" : "secondary")">
+                            @Model.StepExec.State
+                        </span>
+                    </div>
+                    <div>
+                        <strong>Order:</strong> @Model.BuildOrder.ExternalRef | 
+                        <strong>Serial:</strong> @Model.BuildOrder.SerialNumber
+                        @if (!string.IsNullOrEmpty(Model.StepTargetDisplay))
+                        {
+                            <span style="margin-left:1rem; font-weight:600;">Target: <span id="step-target-display">@Model.StepTargetDisplay</span></span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.CurrentRun != null)
+            {
+                <div class="timer-display" id="timer">
+                    <div class="timer-target-row" style="display:flex;gap:2rem;justify-content:center;align-items:center;">
+                        <div class="timer-box" style="text-align:center;">
+                            <div class="timer-label">Elapsed</div>
+                            <span id="timerDisplay" class="timer-value">00:00:00</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.StepTargetDisplay))
+                        {
+                            <div class="timer-box" style="text-align:center;">
+                                <div class="timer-label">Target</div>
+                                <span id="targetDisplay" class="timer-value">@Model.StepTargetDisplay</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="step-info">
+                <h3>Instructions</h3>
+                <div style="font-size: 1.1rem; line-height: 1.6;">
+                    @Html.Raw(ManufacturingTimeTracking.Helpers.InstructionFormatter.FormatInstructions(Model.StepExec.Instructions))
+                </div>
+            </div>
+
+            @* Display step template media (images, PDFs) *@
+            @if (Model.StepTemplateMedia != null && Model.StepTemplateMedia.Any())
+            {
+                <div class="step-info">
+                    <h4>Reference Documents</h4>
+                    <div class="row">
+                        @foreach (var stepMedia in Model.StepTemplateMedia)
+                        {
+                            <div class="col-md-3 mb-3">
+                                @if (stepMedia.Media.Type == "Image")
+                                {
+                                    <div class="card">
+                                        <img src="~/uploads/@stepMedia.Media.UrlOrPath" 
+                                             class="card-img-top img-thumbnail" 
+                                             style="cursor: pointer; height: 150px; object-fit: cover;" 
+                                             onclick="openImageModal('@Url.Content($"~/uploads/{stepMedia.Media.UrlOrPath}")')" 
+                                             alt="@stepMedia.Caption" />
+                                        @if (!string.IsNullOrEmpty(stepMedia.Caption))
+                                        {
+                                            <div class="card-body">
+                                                <p class="card-text small">@stepMedia.Caption</p>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else if (stepMedia.Media.Type == "PDF")
+                                {
+                                    <div class="card">
+                                        <div class="card-body text-center">
+                                            <i class="bi bi-file-pdf" style="font-size: 3rem; color: red;"></i>
+                                            <p class="card-text">PDF Document</p>
+                                            @if (!string.IsNullOrEmpty(stepMedia.Caption))
+                                            {
+                                                <p class="card-text small">@stepMedia.Caption</p>
+                                            }
+                                            <a href="~/uploads/@stepMedia.Media.UrlOrPath" target="_blank" class="inline-flex px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">View PDF</a>
+                                        </div>
+                                    </div>
+                                }
+                                else if (stepMedia.Media.Type == "Video")
+                                {
+                                    <div class="card">
+                                        <div class="card-body text-center">
+                                            <i class="bi bi-play-circle" style="font-size: 3rem;"></i>
+                                            <p class="card-text">Video</p>
+                                            @if (!string.IsNullOrEmpty(stepMedia.Caption))
+                                            {
+                                                <p class="card-text small">@stepMedia.Caption</p>
+                                            }
+                                            <a href="~/uploads/@stepMedia.Media.UrlOrPath" target="_blank" class="inline-flex px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">View Video</a>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+
+            <div class="action-buttons">
+                @if (Model.CurrentRun != null)
+                {
+                    <button type="button" class="btn-fullscreen px-4 py-3 rounded-lg font-medium text-white bg-amber-500 hover:bg-amber-600" data-stepview-modal-show="logInterruptionPauseModal">Pause</button>
+                    <form method="post" asp-page="/Orders/Execute" asp-page-handler="StopStep" style="display:inline;">
+                        <input type="hidden" name="stepExecId" value="@Model.StepExec.Id" />
+                        <button type="submit" class="btn-fullscreen px-4 py-3 rounded-lg font-medium text-white bg-emerald-600 hover:bg-emerald-700">Complete Step</button>
+                    </form>
+                }
+                else if (Model.StepExec.State != "Done" && Model.StepExec.State != "Skipped")
+                {
+                    <form method="post" asp-page="/Orders/Execute" asp-page-handler="StartStep" style="display:inline;">
+                        <input type="hidden" name="stepExecId" value="@Model.StepExec.Id" />
+                        <button type="submit" class="btn-fullscreen px-4 py-3 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700">Start Step</button>
+                    </form>
+                }
+                else if (Model.StepExec.State == "Done")
+                {
+                    <form method="post" asp-page="/Orders/Execute" asp-page-handler="ReopenStep" style="display:inline;">
+                        <input type="hidden" name="stepExecId" value="@Model.StepExec.Id" />
+                        <button type="submit" class="btn-fullscreen px-4 py-3 rounded-lg font-medium text-white bg-amber-500 hover:bg-amber-600">Reopen Step</button>
+                    </form>
+                }
+            </div>
+
+            @if (Model.CurrentRun != null)
+            {
+                <!-- Log interruption (Pause) - mandatory (issue #10) -->
+                <div class="fixed inset-0 z-[100] hidden bg-black/50 flex items-center justify-center p-4" id="logInterruptionPauseModal" role="dialog">
+                    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-slate-200" onclick="event.stopPropagation()">
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                            <h2 class="text-lg font-semibold text-slate-800">Log interruption</h2>
+                            <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 stepview-modal-close" data-stepview-close="logInterruptionPauseModal" aria-label="Close">&times;</button>
+                        </div>
+                        <form method="post" asp-page="/Orders/Execute" asp-page-handler="LogInterruptionAndPauseStep">
+                            <div class="p-6">
+                                <p class="text-slate-500 text-sm mb-3">You must log why you are pausing this step before continuing.</p>
+                                <input type="hidden" name="stepExecId" value="@Model.StepExec.Id" />
+                                <div class="mb-3">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Notes <span class="text-red-500">*</span></label>
+                                    <textarea name="notes" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500" rows="3" required placeholder="e.g. Waiting for parts, machine issue..."></textarea>
+                                </div>
+                            </div>
+                            <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-200">
+                                <button type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 stepview-modal-close" data-stepview-close="logInterruptionPauseModal">Cancel</button>
+                                <button type="submit" class="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600">Log &amp; Pause</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Media Sidebar (25%) -->
+        <div class="media-sidebar">
+            @* Tools and Fasteners Section at the top *@
+            @if ((Model.StepExec.Tools != null && Model.StepExec.Tools.Any()) || (Model.StepExec.Materials != null && Model.StepExec.Materials.Any()))
+            {
+                <div style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    @if (Model.StepExec.Tools != null && Model.StepExec.Tools.Any())
+                    {
+                        <h5 style="color: white; margin-bottom: 10px;">🔧 Required Tools</h5>
+                        <ul style="color: #ddd; margin-bottom: 15px; padding-left: 20px;">
+                            @foreach (var tool in Model.StepExec.Tools)
+                            {
+                                <li style="margin-bottom: 5px;">@tool.ToolName</li>
+                            }
+                        </ul>
+                    }
+                    @if (Model.StepExec.Materials != null && Model.StepExec.Materials.Any())
+                    {
+                        <h5 style="color: white; margin-bottom: 10px;">🔩 Fasteners / Materials</h5>
+                        <ul style="color: #ddd; margin-bottom: 15px; padding-left: 20px;">
+                            @foreach (var material in Model.StepExec.Materials)
+                            {
+                                <li style="margin-bottom: 5px;">
+                                    @material.ToOperatorDisplayString()
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+
+            <h4 style="color: white; margin-bottom: 20px;">📚 Reference Materials</h4>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 20px;">
+                Videos and images from other users working on this step
+            </p>
+
+            @if (Model.StepExec.Evidence.Any())
+            {
+                @foreach (var evidence in Model.StepExec.Evidence.OrderByDescending(e => e.CreatedAt))
+                {
+                    <div class="evidence-item">
+                        @if (evidence.Media.Type == "Video" && !string.IsNullOrEmpty(evidence.Media.UrlOrPath))
+                        {
+                            <div class="video-container">
+                                <video controls autoplay muted loop class="step-video">
+                                    <source src="/uploads/@evidence.Media.UrlOrPath" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                            <small>Video by @evidence.Media.UploadedBy - @evidence.CreatedAt.ToString("g")</small>
+                        }
+                        else if (evidence.Media.Type == "Image" && !string.IsNullOrEmpty(evidence.Media.UrlOrPath))
+                        {
+                            <div class="image-container">
+                                <img src="/uploads/@evidence.Media.UrlOrPath" 
+                                     alt="Instruction" 
+                                     style="cursor: pointer;" 
+                                     onclick="openImageModal('/uploads/@evidence.Media.UrlOrPath')" />
+                            </div>
+                            <small>Image by @evidence.Media.UploadedBy - @evidence.CreatedAt.ToString("g")</small>
+                        }
+                        @if (!string.IsNullOrEmpty(evidence.Note))
+                        {
+                            <div style="margin-top: 10px; padding: 10px; background: #1a1a1a; border-radius: 5px;">
+                                <strong>Note:</strong>
+                                <p style="margin: 5px 0 0 0; color: #ddd;">@evidence.Note</p>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="evidence-item">
+                    <p style="color: #aaa; text-align: center;">No reference materials yet.<br/>Be the first to add one!</p>
+                </div>
+            }
+
+            <div style="margin-top: auto; padding-top: 20px;">
+                <a href="/Orders/Execute?id=@Model.BuildOrder.Id" class="inline-block w-full text-center px-4 py-2 rounded-lg border border-slate-500 text-slate-200 hover:bg-slate-700">
+                    ← Back to Execution
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div class="fixed inset-0 z-[100] hidden bg-black/80 flex items-center justify-center p-4" id="imageModal" role="dialog" aria-hidden="true">
+        <div class="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onclick="event.stopPropagation()">
+            <button type="button" class="absolute top-2 right-2 p-2 rounded-lg bg-white/90 text-slate-700 hover:bg-white stepview-modal-close" data-stepview-close="imageModal" aria-label="Close">&times;</button>
+            <img id="modalImage" src="" class="max-w-full max-h-[85vh] rounded-lg object-contain" alt="Preview" />
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script>
+        (function() {
+            function showStepViewModal(id) {
+                var el = document.getElementById(id);
+                if (el) { el.classList.remove('hidden'); el.classList.add('flex'); document.body.style.overflow = 'hidden'; }
+            }
+            function hideStepViewModal(id) {
+                var el = document.getElementById(id);
+                if (el) { el.classList.add('hidden'); el.classList.remove('flex'); document.body.style.overflow = ''; }
+            }
+            document.querySelectorAll('[data-stepview-modal-show]').forEach(function(btn) {
+                btn.addEventListener('click', function() { showStepViewModal(btn.getAttribute('data-stepview-modal-show')); });
+            });
+            document.querySelectorAll('.stepview-modal-close').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var id = btn.getAttribute('data-stepview-close');
+                    if (id) hideStepViewModal(id);
+                });
+            });
+            document.getElementById('logInterruptionPauseModal')?.addEventListener('click', function(e) {
+                if (e.target === this) hideStepViewModal('logInterruptionPauseModal');
+            });
+            document.getElementById('imageModal')?.addEventListener('click', function(e) {
+                if (e.target === this) hideStepViewModal('imageModal');
+            });
+            window.openImageModal = function(imageSrc) {
+                document.getElementById('modalImage').src = imageSrc;
+                showStepViewModal('imageModal');
+            };
+        })();
+        // Auto-play videos when they come into view
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const videoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.play();
+                } else {
+                    entry.target.pause();
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.step-video').forEach(video => {
+            videoObserver.observe(video);
+        });
+
+        // Audio alarm utilities
+        let _audioCtx = null;
+        function ensureAudioContext() {
+            if (!_audioCtx) {
+                try {
+                    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.warn('AudioContext unavailable', e);
+                    _audioCtx = null;
+                }
+            }
+            return _audioCtx;
+        }
+
+        function playBeep(freq, duration = 200, volume = 0.5) {
+            const ctx = ensureAudioContext();
+            if (!ctx) return;
+            try {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.value = volume;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                const now = ctx.currentTime;
+                osc.start(now);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration / 1000);
+                osc.stop(now + duration / 1000 + 0.02);
+            } catch (e) { console.error('playBeep error', e); }
+        }
+
+        function playOrangeAlarm() { playBeep(880, 180, 0.35); }
+        function playRedAlarm() {
+            // audible sequence: three short beeps
+            playBeep(440, 160, 0.6);
+            setTimeout(() => playBeep(440, 160, 0.6), 240);
+            setTimeout(() => playBeep(440, 160, 0.6), 480);
+        }
+
+        // allow resuming audio on first user gesture if needed
+        document.addEventListener('click', function _resumeOnce() {
+            if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume().catch(()=>{});
+            document.removeEventListener('click', _resumeOnce);
+        });
+
+        let lastAlarmState = 0; // 0 none, 1 orange, 2 red
+        let lastAlarmChangeTs = 0; // timestamp ms of last visual/audio state change
+
+        // Timer: elapsed time from 00:00:00, timezone-independent (start time in UTC epoch ms)
+        @if (Model.CurrentRun != null && Model.CurrentRunStartedAtEpochMs.HasValue)
+        {
+            <text>
+            const startTimeMs = @Model.CurrentRunStartedAtEpochMs.Value;
+            function updateTimer() {
+                const diffMs = Math.max(0, Date.now() - startTimeMs);
+                const totalSeconds = Math.floor(diffMs / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                document.getElementById('timerDisplay').textContent =
+                    String(hours).padStart(2, '0') + ':' +
+                    String(minutes).padStart(2, '0') + ':' +
+                    String(seconds).padStart(2, '0');
+                // check against target and apply alarm classes
+                try {
+                    var targetSec = @((Model.StepTargetSeconds.HasValue) ? Model.StepTargetSeconds.Value.ToString() : "null");
+                    if (targetSec !== null && targetSec !== 'null') {
+                        var t = Number(targetSec);
+                        if (!isNaN(t) && t > 0) {
+                            var pct = totalSeconds / t;
+                            var timerEl = document.getElementById('timerDisplay');
+                            var targetEl = document.getElementById('targetDisplay');
+                            var timerBox = timerEl ? timerEl.closest('.timer-box') : null;
+                            var targetBox = targetEl ? targetEl.closest('.timer-box') : null;
+                            var headerEl = document.querySelector('.step-header');
+                            var mainEl = document.querySelector('.main-content');
+                            // Enforce minimum 60s duration on each state change (each flank)
+                            const nowTs = Date.now();
+                            if (pct >= 1) {
+                                // desired state = 2 (red)
+                                if (lastAlarmState !== 2) {
+                                    if (lastAlarmChangeTs === 0 || (nowTs - lastAlarmChangeTs) >= 60000) {
+                                        // apply red
+                                        if (timerEl) { timerEl.classList.remove('alarm-orange'); timerEl.classList.add('alarm-red'); }
+                                        if (targetEl) { targetEl.classList.remove('alarm-orange'); targetEl.classList.add('alarm-red'); }
+                                        if (timerBox) { timerBox.classList.remove('alarm-orange-box'); timerBox.classList.add('alarm-red-box'); }
+                                        if (targetBox) { targetBox.classList.remove('alarm-orange-box'); targetBox.classList.add('alarm-red-box'); }
+                                        if (headerEl) { headerEl.classList.remove('alarm-orange-bg'); headerEl.classList.add('alarm-red-bg'); }
+                                        if (mainEl) { mainEl.classList.remove('alarm-orange-bg'); mainEl.classList.add('alarm-red-bg'); }
+                                        try { playRedAlarm(); } catch(e){}
+                                        lastAlarmState = 2; lastAlarmChangeTs = nowTs;
+                                    }
+                                }
+                            } else if (pct >= 0.85) {
+                                // desired state = 1 (orange)
+                                if (lastAlarmState !== 1) {
+                                    if (lastAlarmChangeTs === 0 || (nowTs - lastAlarmChangeTs) >= 60000) {
+                                        if (timerEl) { timerEl.classList.remove('alarm-red'); timerEl.classList.add('alarm-orange'); }
+                                        if (targetEl) { targetEl.classList.remove('alarm-red'); targetEl.classList.add('alarm-orange'); }
+                                        if (timerBox) { timerBox.classList.remove('alarm-red-box'); timerBox.classList.add('alarm-orange-box'); }
+                                        if (targetBox) { targetBox.classList.remove('alarm-red-box'); targetBox.classList.add('alarm-orange-box'); }
+                                        if (headerEl) { headerEl.classList.remove('alarm-red-bg'); headerEl.classList.add('alarm-orange-bg'); }
+                                        if (mainEl) { mainEl.classList.remove('alarm-red-bg'); mainEl.classList.add('alarm-orange-bg'); }
+                                        try { playOrangeAlarm(); } catch(e){}
+                                        lastAlarmState = 1; lastAlarmChangeTs = nowTs;
+                                    }
+                                }
+                            } else {
+                                // desired state = 0 (clear). Allow clearing only if min duration passed
+                                if (lastAlarmState !== 0) {
+                                    if (lastAlarmChangeTs === 0 || (nowTs - lastAlarmChangeTs) >= 60000) {
+                                        if (timerEl) { timerEl.classList.remove('alarm-red'); timerEl.classList.remove('alarm-orange'); }
+                                        if (targetEl) { targetEl.classList.remove('alarm-red'); targetEl.classList.remove('alarm-orange'); }
+                                        if (timerBox) { timerBox.classList.remove('alarm-red-box'); timerBox.classList.remove('alarm-orange-box'); }
+                                        if (targetBox) { targetBox.classList.remove('alarm-red-box'); targetBox.classList.remove('alarm-orange-box'); }
+                                        if (headerEl) { headerEl.classList.remove('alarm-red-bg'); headerEl.classList.remove('alarm-orange-bg'); }
+                                        if (mainEl) { mainEl.classList.remove('alarm-red-bg'); mainEl.classList.remove('alarm-orange-bg'); }
+                                        lastAlarmState = 0; lastAlarmChangeTs = nowTs;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch(e) { console.error(e); }
+            }
+            setInterval(updateTimer, 1000);
+            updateTimer();
+            </text>
+        }
+
+        // Request fullscreen on load
+        document.addEventListener('DOMContentLoaded', () => {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log('Fullscreen not available:', err);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

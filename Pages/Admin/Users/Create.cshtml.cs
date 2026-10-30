@@ -1,0 +1,129 @@
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
+using ManufacturingTimeTracking.Models;
+
+namespace ManufacturingTimeTracking.Pages.Admin.Users;
+
+[Authorize(Policy = "CanManageUsers")]
+public class CreateModel : PageModel
+{
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly RoleManager<IdentityRole> _roleManager;
+
+    public CreateModel(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
+    {
+        _userManager = userManager;
+        _roleManager = roleManager;
+    }
+
+    [BindProperty]
+    public InputModel Input { get; set; } = new();
+
+    public List<SelectListItem> RoleList { get; set; } = new();
+
+    public class InputModel
+    {
+        [Display(Name = "First name")]
+        [StringLength(256)]
+        public string? FirstName { get; set; }
+
+        [Display(Name = "Last name")]
+        [StringLength(256)]
+        public string? LastName { get; set; }
+
+        [Display(Name = "DNI")]
+        [StringLength(64)]
+        public string? Dni { get; set; }
+
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = string.Empty;
+
+        [Display(Name = "User name (optional)")]
+        [StringLength(256)]
+        public string? UserName { get; set; }
+
+        [Required(ErrorMessage = "Password is required.")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters.")]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = string.Empty;
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "Passwords do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "A role is required.")]
+        [Display(Name = "Role")]
+        public string Role { get; set; } = string.Empty;
+    }
+
+    public async Task<IActionResult> OnGetAsync()
+    {
+        await LoadRoleListAsync();
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostAsync()
+    {
+        await LoadRoleListAsync();
+
+        if (!ModelState.IsValid)
+            return Page();
+
+        var userName = string.IsNullOrWhiteSpace(Input.UserName) ? Input.Email : Input.UserName.Trim();
+        if (await _userManager.FindByEmailAsync(Input.Email) != null)
+        {
+            ModelState.AddModelError(nameof(Input.Email), "A user with this email already exists.");
+            return Page();
+        }
+        if (await _userManager.FindByNameAsync(userName) != null && !string.IsNullOrWhiteSpace(Input.UserName))
+        {
+            ModelState.AddModelError(nameof(Input.UserName), "A user with this user name already exists.");
+            return Page();
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = userName,
+            Email = Input.Email,
+            EmailConfirmed = false,
+            FirstName = Input.FirstName?.Trim(),
+            LastName = Input.LastName?.Trim(),
+            Dni = Input.Dni?.Trim()
+        };
+
+        var createResult = await _userManager.CreateAsync(user, Input.Password);
+        if (!createResult.Succeeded)
+        {
+            foreach (var err in createResult.Errors)
+                ModelState.AddModelError(string.Empty, err.Description);
+            return Page();
+        }
+
+        var roleResult = await _userManager.AddToRoleAsync(user, Input.Role);
+        if (!roleResult.Succeeded)
+        {
+            foreach (var err in roleResult.Errors)
+                ModelState.AddModelError(nameof(Input.Role), err.Description);
+            return Page();
+        }
+
+        TempData["ToastrSuccess"] = "User created successfully. They can now sign in with their email and password.";
+        return RedirectToPage("./Index");
+    }
+
+    private async Task LoadRoleListAsync()
+    {
+        RoleList = (await _roleManager.Roles.OrderBy(r => r.Name).ToListAsync())
+            .Select(r => new SelectListItem(r.Name, r.Name!))
+            .ToList();
+    }
+}

@@ -1,0 +1,59 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.WeeklyLoadModel
+@{
+    ViewData["Title"] = "Weekly Load";
+}
+
+<div class="animate-fade-in">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-bold text-slate-800">Weekly Load</h1>
+        <a asp-page="./Index" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 w-fit">Back to Orders</a>
+    </div>
+    <p class="text-slate-500 mb-6">Planned workload (sum of StandardHours per order) vs capacity. Capacity is configured as <strong>@Model.WeeklyCapacityHours.ToString("N0") h/week</strong> (Planning:WeeklyCapacityHours).</p>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden max-w-4xl mx-auto">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 table-fixed w-full">
+                <thead class="bg-slate-50/80">
+                    <tr>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Planned week</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Orders</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Planned (h)</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Capacity (h)</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Utilization %</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Overload</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @if (!Model.Rows.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-500">No orders with a planned week in the system.</td>
+                        </tr>
+                    }
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr class="table-row-hover @(row.IsOverload ? "bg-red-50/50" : "")">
+                            <td class="px-6 py-4 text-center font-medium text-slate-800">@row.PlannedWeek</td>
+                            <td class="px-6 py-4 text-center text-slate-600">@row.OrderCount</td>
+                            <td class="px-6 py-4 text-center text-slate-800 font-medium">@row.PlannedHours.ToString("N2")</td>
+                            <td class="px-6 py-4 text-center text-slate-600">@row.CapacityHours.ToString("N0")</td>
+                            <td class="px-6 py-4 text-center font-medium @(row.UtilizationPercent > 100 ? "text-red-600" : "text-slate-800")">@row.UtilizationPercent.ToString("N1")%</td>
+                            <td class="px-6 py-4 text-center">
+                                @if (row.IsOverload)
+                                {
+                                    <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Overload</span>
+                                }
+                                else
+                                {
+                                    <span class="text-slate-400">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="_Pagination" model="Model.Pagination" />
+    </div>
+</div>

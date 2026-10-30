@@ -1,0 +1,132 @@
+@model ManufacturingTimeTracking.Models.Inventory.Item
+@{
+    ViewData["Title"] = "Details";
+}
+<div class="animate-fade-in w-full">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-bold text-slate-800">@Model.Sku — @Model.Name</h1>
+        <div class="flex gap-2">
+            <button type="button" class="px-4 py-2 rounded-xl border border-emerald-600 text-emerald-600 font-medium hover:bg-emerald-50 transition-all duration-200" data-modal-show="printLabelModal" data-print-label-url="@Url.Action("PrintLabel", "Items", new { itemId = Model.Id })">Print label</button>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="px-4 py-2 rounded-xl border border-blue-600 text-blue-600 font-medium hover:bg-blue-50 transition-all duration-200">Edit</a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            @if (!string.IsNullOrWhiteSpace(Model.ImagePath))
+            {
+                <div>
+                    <img src="@Model.ImagePath" class="rounded-xl border border-slate-100 w-full max-h-48 object-cover" alt="Item image" />
+                </div>
+            }
+            <div class="@(string.IsNullOrWhiteSpace(Model.ImagePath) ? "sm:col-span-2" : "sm:col-span-2") space-y-3">
+                <div><span class="text-sm font-medium text-slate-500">Serialized</span><br /><span class="text-slate-800">@(Model.IsSerialized ? "Yes" : "No")</span></div>
+                <div><span class="text-sm font-medium text-slate-500">Family</span><br /><span class="text-slate-800">@(Model.Family ?? "—")</span></div>
+                <div><span class="text-sm font-medium text-slate-500">Model/Type</span><br /><span class="text-slate-800">@(string.IsNullOrWhiteSpace(Model.ModelOrType) ? "—" : Model.ModelOrType)</span></div>
+                <div><span class="text-sm font-medium text-slate-500">Unit</span><br /><span class="text-slate-800">@(Model.Unit ?? "—")</span></div>
+                @if (Model.MaterialId.HasValue)
+                {
+                    <div><span class="text-sm font-medium text-slate-500">Linked to Material</span><br /><span class="text-slate-800">@(Model.Material?.Name ?? "ID " + Model.MaterialId)</span></div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <h2 class="text-lg font-semibold text-slate-800 mb-3">Associated tags</h2>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 table-fixed w-full">
+                <thead class="bg-slate-50/80">
+                    <tr>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-4 text-center w-5/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Code</th>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Pack</th>
+                        <th class="px-6 py-4 text-center w-3/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var t in Model.Tags)
+                    {
+                        <tr class="table-row-hover">
+                            <td class="px-6 py-4 text-center w-2/12 text-slate-800">@t.TagType</td>
+                            <td class="px-6 py-4 text-center w-5/12"><code class="px-2 py-1 rounded bg-slate-100 text-slate-700 text-sm">@t.Code</code></td>
+                            <td class="px-6 py-4 text-center w-2/12 text-slate-600">@t.PackQuantity</td>
+                            <td class="px-6 py-4 text-center w-3/12">
+                                <button type="button" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-600 text-sm font-medium hover:bg-emerald-50 mr-2" data-modal-show="printLabelModal" data-print-label-url="@Url.Action("PrintLabel", "Items", new { itemId = Model.Id, tagId = t.Id })">Print label</button>
+                                @if (t.TagType == "QR")
+                                {
+                                    <button type="button" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50" data-modal-show="viewQrModal" data-qr-url="@Url.Action("ItemQr", "Items", new { code = t.Code })">View QR</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Print label modal: iframe loads the print label page -->
+<div class="tw-modal fixed inset-0 z-[100] hidden" id="printLabelModal" role="dialog" aria-labelledby="printLabelModalTitle" aria-modal="true">
+    <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <h2 class="text-lg font-semibold text-slate-800" id="printLabelModalTitle">Print label</h2>
+            <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+        </div>
+        <div class="p-0">
+            <iframe id="printLabelFrame" style="width:100%; height:70vh; border:0;" title="Print label"></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- View QR modal: shows QR image -->
+<div class="tw-modal fixed inset-0 z-[100] hidden" id="viewQrModal" role="dialog" aria-labelledby="viewQrModalTitle" aria-modal="true">
+    <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <h2 class="text-lg font-semibold text-slate-800" id="viewQrModalTitle">QR Code</h2>
+            <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+        </div>
+        <div class="text-center p-4">
+            <img id="viewQrImage" src="" alt="QR Code" class="mx-auto max-w-full" />
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    document.querySelectorAll('[data-modal-show="printLabelModal"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var url = this.getAttribute('data-print-label-url');
+            var frame = document.getElementById('printLabelFrame');
+            if (url && frame) frame.src = url;
+        });
+    });
+    document.querySelectorAll('[data-modal-show="viewQrModal"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var url = this.getAttribute('data-qr-url');
+            var img = document.getElementById('viewQrImage');
+            if (url && img) img.src = url;
+        });
+    });
+    var printModal = document.getElementById('printLabelModal');
+    if (printModal) {
+        new MutationObserver(function() {
+            if (printModal.classList.contains('hidden')) {
+                var frame = document.getElementById('printLabelFrame');
+                if (frame) frame.src = '';
+            }
+        }).observe(printModal, { attributes: true, attributeFilter: ['class'] });
+    }
+    var viewModal = document.getElementById('viewQrModal');
+    if (viewModal) {
+        new MutationObserver(function() {
+            if (viewModal.classList.contains('hidden')) {
+                var img = document.getElementById('viewQrImage');
+                if (img) img.src = '';
+            }
+        }).observe(viewModal, { attributes: true, attributeFilter: ['class'] });
+    }
+</script>
+}

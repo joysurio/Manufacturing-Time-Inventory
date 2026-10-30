@@ -1,0 +1,48 @@
+@page "{id:int}"
+@model ManufacturingTimeTracking.Pages.AI.Prompts.PromptsEditModel
+@{
+    ViewData["Title"] = "Edit Prompt";
+}
+
+<div class="max-w-3xl mx-auto animate-slide-up">
+    <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center text-white shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </div>
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Edit Prompt</h1>
+            <p class="text-sm text-slate-500 mt-0.5">@Model.OriginalName</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100">
+        <form method="post" asp-route-id="@Model.PromptId" class="px-6 py-5 space-y-4">
+            @Html.AntiForgeryToken()
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Name <span class="text-red-400">*</span></label>
+                    <input asp-for="Input.Name"
+                           class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Description</label>
+                    <input asp-for="Input.Description"
+                           class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Prompt Text <span class="text-red-400">*</span></label>
+                <p class="text-xs text-slate-400 mb-2">Use <code class="bg-slate-100 px-1 rounded">{DATA}</code> as placeholder — it will be replaced with the actual data before sending to GPT.</p>
+                <textarea asp-for="Input.PromptText" rows="14"
+                          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-400 resize-y"></textarea>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors shadow-sm">
+                    Save Changes
+                </button>
+                <a asp-page="./Index" class="text-sm text-slate-500 hover:text-slate-700 transition-colors">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

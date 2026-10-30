@@ -1,0 +1,106 @@
+@page
+@model ManufacturingTimeTracking.Pages.Tasks.CreateModel
+@{
+    ViewData["Title"] = "Create Task";
+}
+
+<div class="animate-fade-in max-w-2xl mx-auto">
+    <div class="mb-6">
+        <a asp-page="./Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">← Tasks</a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Create task</h1>
+    <p class="text-slate-500 mb-6">Add an internal task (e.g. cleaning, customer visit, maintenance). Assign it to a user; they can start, pause, resume and finish it with time tracking.</p>
+
+    <form method="post" class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+        <div asp-validation-summary="All" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm mb-4"></div>
+
+        <div class="mb-5">
+            <label asp-for="Input.Title" class="block text-sm font-medium text-slate-700 mb-1.5">Task title <span class="text-red-500">*</span></label>
+            <input asp-for="Input.Title" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="e.g. Cleaning, Customer visit, Maintenance" />
+            <span asp-validation-for="Input.Title" class="text-red-600 text-sm mt-1 block"></span>
+        </div>
+
+        <div class="mb-5">
+            <label asp-for="Input.Description" class="block text-sm font-medium text-slate-700 mb-1.5">Description (optional)</label>
+            <textarea asp-for="Input.Description" rows="3" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Optional details"></textarea>
+        </div>
+
+        <div class="mb-6">
+            <label asp-for="Input.AssignedUserId" class="block text-sm font-medium text-slate-700 mb-1.5">Assigned to <span class="text-red-500">*</span></label>
+            <div class="relative">
+                <input type="text"
+                       id="assigned-user-search"
+                       class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm"
+                       placeholder="Type to search user by name or email..." autocomplete="off" />
+                <input type="hidden" asp-for="Input.AssignedUserId" id="assigned-user-value" />
+                <div id="assigned-user-list"
+                     class="absolute left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-50 hidden">
+                    @foreach (var opt in Model.UserSelectList)
+                    {
+                        <button type="button"
+                                class="user-option w-full text-left px-4 py-2.5 text-sm text-slate-800 hover:bg-blue-50 border-b border-slate-100 last:border-b-0"
+                                data-value="@opt.Value"
+                                data-text="@opt.Text">
+                            @opt.Text
+                        </button>
+                    }
+                </div>
+            </div>
+            <span asp-validation-for="Input.AssignedUserId" class="text-red-600 text-sm mt-1 block"></span>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Create task</button>
+            <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const searchInput = document.getElementById('assigned-user-search');
+            const hiddenValue = document.getElementById('assigned-user-value');
+            const list = document.getElementById('assigned-user-list');
+            if (!searchInput || !hiddenValue || !list) return;
+
+            const allButtons = Array.from(list.querySelectorAll('.user-option'))
+                .map(btn => ({ btn, value: btn.dataset.value || '', text: (btn.dataset.text || '').toLowerCase() }));
+
+            function filterList(query) {
+                const q = (query || '').toLowerCase().trim();
+                let firstVisible = null;
+                allButtons.forEach(x => {
+                    const match = !q || x.text.includes(q);
+                    x.btn.classList.toggle('hidden', !match);
+                    if (match && !firstVisible) firstVisible = x.btn;
+                });
+                list.classList.toggle('hidden', !firstVisible);
+            }
+
+            allButtons.forEach(x => {
+                x.btn.addEventListener('click', function () {
+                    hiddenValue.value = x.value;
+                    searchInput.value = x.btn.dataset.text || '';
+                    list.classList.add('hidden');
+                });
+            });
+
+            searchInput.addEventListener('input', function () {
+                hiddenValue.value = '';
+                filterList(this.value);
+            });
+
+            searchInput.addEventListener('focus', function () {
+                filterList(this.value);
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!e.target.closest('#assigned-user-list') && !e.target.closest('#assigned-user-search')) {
+                    list.classList.add('hidden');
+                }
+            });
+        })();
+    </script>
+}

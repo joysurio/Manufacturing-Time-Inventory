@@ -1,0 +1,37 @@
+@{
+    ViewData["Title"] = "Inventory Reports";
+    var stockValue = (decimal)(ViewBag.MaterialStockValue ?? 0m);
+    var totalUnits = (int)(ViewBag.MaterialTotalUnits ?? 0);
+}
+
+<div class="animate-fade-in">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Inventory Reports</h1>
+    <p class="text-slate-500 mb-6">Choose a report to view stock by warehouse, item, or model/type.</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div class="p-6 rounded-2xl bg-white border border-slate-100 shadow-soft">
+            <p class="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1">Total stock (materials)</p>
+            <p class="text-3xl font-bold text-slate-800">@totalUnits.ToString("N0") <span class="text-base font-medium text-slate-500">units</span></p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white border border-emerald-100 shadow-soft">
+            <p class="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1">Total stock value</p>
+            <p class="text-3xl font-bold text-emerald-700">@stockValue.ToString("N2") €</p>
+            <p class="text-xs text-slate-400 mt-1">Based on unit prices of materials with price set</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a asp-action="ReportByWarehouse" class="block p-6 rounded-2xl bg-white border border-slate-100 shadow-soft hover-lift hover:border-blue-100 hover:shadow-card transition-all duration-200 group">
+            <span class="text-lg font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">By Warehouse</span>
+            <p class="text-slate-500 text-sm mt-1">Stock grouped by location (warehouse/zone)</p>
+        </a>
+        <a asp-action="ReportByItem" class="block p-6 rounded-2xl bg-white border border-slate-100 shadow-soft hover-lift hover:border-blue-100 hover:shadow-card transition-all duration-200 group">
+            <span class="text-lg font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">By Item</span>
+            <p class="text-slate-500 text-sm mt-1">Stock grouped by product (SKU), with locations</p>
+        </a>
+        <a asp-action="ReportByModel" class="block p-6 rounded-2xl bg-white border border-slate-100 shadow-soft hover-lift hover:border-blue-100 hover:shadow-card transition-all duration-200 group">
+            <span class="text-lg font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">By Model / Type</span>
+            <p class="text-slate-500 text-sm mt-1">Stock grouped by item model or type</p>
+        </a>
+    </div>
+</div>

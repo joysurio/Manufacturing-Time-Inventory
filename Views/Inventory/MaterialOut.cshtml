@@ -1,0 +1,344 @@
+@model ManufacturingTimeTracking.Controllers.MaterialOutViewModel
+@{
+    ViewData["Title"] = "Material Out";
+    var materials = ViewBag.Materials as IEnumerable<dynamic> ?? new List<dynamic>();
+    var materialSets = ViewBag.MaterialSets as IEnumerable<dynamic> ?? new List<dynamic>();
+    var stockData = ViewBag.StockByMaterialLocation as IEnumerable<dynamic> ?? new List<dynamic>();
+    var orders = ViewBag.ActiveOrders as IEnumerable<dynamic> ?? new List<dynamic>();
+}
+<div class="animate-fade-in">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Material Out</h1>
+    <p class="text-slate-500 mb-6">Record materials removed from stock. Choose a single material or a material set, then destination (order or client). For sets, the system will auto-use each material's location when there is only one.</p>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 max-w-lg mx-auto">
+        <form asp-action="MaterialOut" method="post" class="space-y-5" id="MaterialOutForm">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm"></div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Output type</label>
+                <div class="flex gap-6 mb-3">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="UseSet" value="single" id="UseSingle" class="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500" checked />
+                        <span>Single material</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="UseSet" value="set" id="UseSet" class="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500" />
+                        <span>Material set</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="SingleMaterialGroup">
+                <div class="relative">
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">Material</label>
+                    <input type="text" id="MaterialInput" placeholder="Type to search or scan QR code…" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" autocomplete="off" value="" />
+                    <input type="hidden" asp-for="MaterialId" id="MaterialId" />
+                    <div id="MaterialList" class="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-50 hidden" role="listbox"></div>
+                    <p id="MaterialStockHint" class="text-xs text-slate-500 mt-1 hidden">Select a location below (only locations with stock for this material are shown).</p>
+                    <script type="application/json" id="MaterialData">
+                        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(materials))
+                    </script>
+                </div>
+                <div class="mt-4">
+                    <label asp-for="Quantity" class="block text-sm font-medium text-slate-700 mb-1.5">Quantity</label>
+                    <input asp-for="Quantity" type="number" min="1" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" id="Quantity" />
+                    <span asp-validation-for="Quantity" class="text-red-600 text-sm mt-1 block"></span>
+                </div>
+            </div>
+
+            <div id="MaterialSetGroup" class="hidden">
+                <label class="block text-sm font-medium text-slate-700 mb-1.5">Material set</label>
+                <select id="MaterialSetSelect" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                    <option value="">— Select a set —</option>
+                    @foreach (var s in materialSets)
+                    {
+                        var id = s.Id ?? s.id;
+                        var name = s.Name ?? s.name ?? "Set";
+                        var count = s.ItemCount;
+                        <option value="@id">@name (@(count) material(s))</option>
+                    }
+                </select>
+                <input type="hidden" asp-for="MaterialSetId" id="MaterialSetId" />
+            </div>
+
+            <div id="LocationGroup">
+                <label asp-for="LocationId" class="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
+                <select asp-for="LocationId" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" id="LocationId">
+                    <option value="">— Select material or set first —</option>
+                </select>
+                <span id="LocationStockQty" class="text-xs text-slate-500 mt-1"></span>
+                <p id="LocationHint" class="text-xs text-slate-500 mt-1">For sets, location is only needed when a material has stock in multiple locations.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Destination</label>
+                <div class="flex gap-6 mb-3">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" asp-for="DestinationKind" value="Order" id="DestOrder" class="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500" />
+                        <span>Order</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" asp-for="DestinationKind" value="Client" id="DestClient" class="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500" />
+                        <span>Client</span>
+                    </label>
+                </div>
+                <div id="OrderDest" class="hidden relative">
+                    <label asp-for="BuildOrderId" class="block text-sm font-medium text-slate-600 mb-1">Select order</label>
+                    <input type="text" id="OrderInput" placeholder="Type to search orders…" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" autocomplete="off" value="" />
+                    <input type="hidden" asp-for="BuildOrderId" id="BuildOrderId" />
+                    <div id="OrderList" class="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-50 hidden" role="listbox"></div>
+                </div>
+                <div id="ClientDest" class="hidden">
+                    <label asp-for="DestinationClient" class="block text-sm font-medium text-slate-600 mb-1">Client name</label>
+                    <input asp-for="DestinationClient" type="text" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Enter client name" />
+                </div>
+            </div>
+
+            <div>
+                <label asp-for="Notes" class="block text-sm font-medium text-slate-700 mb-1.5">Notes (optional)</label>
+                <textarea asp-for="Notes" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Any comments…"></textarea>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Record Material Out</button>
+                <a asp-action="Stock" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script type="application/json" id="StockData">
+    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(stockData))
+</script>
+<script type="application/json" id="OrderData">
+    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(orders))
+</script>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function() {
+            var input = document.getElementById('MaterialInput');
+            var hidden = document.getElementById('MaterialId');
+            var listEl = document.getElementById('MaterialList');
+            var locationSelect = document.getElementById('LocationId');
+            var stockHint = document.getElementById('MaterialStockHint');
+            var locationStockQty = document.getElementById('LocationStockQty');
+            var materialDataEl = document.getElementById('MaterialData');
+            var stockDataEl = document.getElementById('StockData');
+            var destOrder = document.getElementById('DestOrder');
+            var destClient = document.getElementById('DestClient');
+            var orderDest = document.getElementById('OrderDest');
+            var clientDest = document.getElementById('ClientDest');
+            var orderInput = document.getElementById('OrderInput');
+            var buildOrderIdHidden = document.getElementById('BuildOrderId');
+            var orderListEl = document.getElementById('OrderList');
+            var orderDataEl = document.getElementById('OrderData');
+
+            var materials = [];
+            var stockData = [];
+            var orders = [];
+            try { materials = JSON.parse(materialDataEl.textContent || '[]'); } catch (e) {}
+            try { stockData = JSON.parse(stockDataEl.textContent || '[]'); } catch (e) {}
+            try { orders = JSON.parse(orderDataEl.textContent || '[]'); } catch (e) {}
+
+            function getStockForMaterial(mid) {
+                return stockData.filter(function(s) { return (s.materialId || s.MaterialId) === mid; });
+            }
+
+            function getMaterialDisplay(m) {
+                var name = m.name || m.Name || ('Material #' + (m.id != null ? m.id : m.Id));
+                var ref = m.reference || m.Reference || '';
+                return ref ? name + ' (Ref: ' + ref + ')' : name;
+            }
+            function showList(filter) {
+                var q = (filter || input.value || '').trim().toLowerCase();
+                var filtered = !q ? materials : materials.filter(function(m) {
+                    var name = (m.name || m.Name || '').toLowerCase();
+                    var ref = (m.reference || m.Reference || '').toLowerCase();
+                    var qr = (m.qr || m.Qr || '').toLowerCase();
+                    return name.indexOf(q) !== -1 || ref.indexOf(q) !== -1 || qr.indexOf(q) !== -1;
+                });
+                listEl.innerHTML = '';
+                listEl.classList.remove('hidden');
+                filtered.forEach(function(m) {
+                    var id = m.id != null ? m.id : m.Id;
+                    var name = m.name || m.Name || ('Material #' + id);
+                    var displayText = getMaterialDisplay(m);
+                    var div = document.createElement('div');
+                    div.setAttribute('role', 'option');
+                    div.className = 'px-4 py-2.5 cursor-pointer hover:bg-blue-50 text-slate-800 border-b border-slate-100 last:border-0';
+                    div.textContent = displayText;
+                    div.dataset.id = id;
+                    div.dataset.name = name;
+                    div.addEventListener('click', function() {
+                        var id = parseInt(this.dataset.id, 10);
+                        hidden.value = id;
+                        input.value = this.textContent;
+                        listEl.classList.add('hidden');
+                        updateLocationDropdown(id);
+                        stockHint.classList.remove('hidden');
+                        input.focus();
+                    });
+                    listEl.appendChild(div);
+                });
+            }
+
+            function updateLocationDropdown(materialId) {
+                var options = getStockForMaterial(materialId);
+                locationSelect.innerHTML = '<option value="">— Select location —</option>';
+                options.forEach(function(s) {
+                    var locId = s.locationId != null ? s.locationId : s.LocationId;
+                    var code = s.locationCode || s.LocationCode || '';
+                    var qty = s.quantity != null ? s.quantity : s.Quantity;
+                    var opt = document.createElement('option');
+                    opt.value = locId;
+                    opt.textContent = code + ' (available: ' + (qty || 0) + ')';
+                    opt.dataset.qty = qty || 0;
+                    locationSelect.appendChild(opt);
+                });
+                if (options.length === 1) {
+                    var singleLocId = options[0].locationId != null ? options[0].locationId : options[0].LocationId;
+                    locationSelect.value = String(singleLocId);
+                    locationSelect.dispatchEvent(new Event('change'));
+                }
+                locationStockQty.textContent = '';
+            }
+
+            function hideList() { listEl.classList.add('hidden'); }
+
+            function getOrderDisplay(o) {
+                return o.Display != null ? o.Display : (o.SerialNumber || '') + ' - ' + (o.ExternalRef || '');
+            }
+
+            function showOrderList(filter) {
+                var q = (filter != null ? filter : orderInput.value).trim().toLowerCase();
+                var filtered = !q ? orders : orders.filter(function(o) {
+                    var display = (getOrderDisplay(o) || '').toLowerCase();
+                    var serial = (o.SerialNumber || o.serialNumber || '').toLowerCase();
+                    var ext = (o.ExternalRef || o.externalRef || '').toLowerCase();
+                    return display.indexOf(q) !== -1 || serial.indexOf(q) !== -1 || ext.indexOf(q) !== -1;
+                });
+                orderListEl.innerHTML = '';
+                orderListEl.classList.remove('hidden');
+                filtered.forEach(function(o) {
+                    var id = o.Id != null ? o.Id : o.id;
+                    var display = getOrderDisplay(o);
+                    var div = document.createElement('div');
+                    div.setAttribute('role', 'option');
+                    div.className = 'px-4 py-2.5 cursor-pointer hover:bg-blue-50 text-slate-800 border-b border-slate-100 last:border-0';
+                    div.textContent = display;
+                    div.dataset.id = id;
+                    div.dataset.display = display;
+                    div.addEventListener('click', function() {
+                        buildOrderIdHidden.value = this.dataset.id;
+                        orderInput.value = this.dataset.display;
+                        orderListEl.classList.add('hidden');
+                        orderInput.focus();
+                    });
+                    orderListEl.appendChild(div);
+                });
+            }
+
+            function hideOrderList() { if (orderListEl) orderListEl.classList.add('hidden'); }
+
+            if (orderInput) {
+                orderInput.addEventListener('focus', function() { showOrderList(); });
+                orderInput.addEventListener('input', function() {
+                    if (!this.value.trim() && buildOrderIdHidden) buildOrderIdHidden.value = '';
+                    showOrderList(this.value);
+                });
+                orderInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') { hideOrderList(); this.blur(); }
+                });
+            }
+            if (orderListEl) {
+                document.addEventListener('click', function orderListClick(e) {
+                    if (orderInput && orderListEl && e.target !== orderInput && e.target !== orderListEl && !orderListEl.contains(e.target))
+                        hideOrderList();
+                });
+            }
+
+            if (buildOrderIdHidden && buildOrderIdHidden.value && orders.length) {
+                var selectedId = parseInt(buildOrderIdHidden.value, 10);
+                var selected = orders.filter(function(o) { return (o.Id != null ? o.Id : o.id) === selectedId; })[0];
+                if (selected) orderInput.value = getOrderDisplay(selected);
+            }
+
+            input.addEventListener('focus', function() { showList(); });
+            input.addEventListener('input', function() { showList(this.value); });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { hideList(); this.blur(); }
+            });
+            document.addEventListener('click', function(e) {
+                if (e.target !== input && e.target !== listEl && !listEl.contains(e.target)) hideList();
+            });
+
+            locationSelect.addEventListener('change', function() {
+                var sel = this.options[this.selectedIndex];
+                locationStockQty.textContent = sel && sel.dataset.qty ? 'Available at this location: ' + sel.dataset.qty : '';
+            });
+
+            function toggleDestination() {
+                var isOrder = destOrder && destOrder.checked;
+                if (orderDest) orderDest.classList.toggle('hidden', !isOrder);
+                if (clientDest) clientDest.classList.toggle('hidden', isOrder);
+            }
+            if (destOrder) destOrder.addEventListener('change', toggleDestination);
+            if (destClient) destClient.addEventListener('change', toggleDestination);
+            toggleDestination();
+
+            // Single material vs Material set
+            var useSingle = document.getElementById('UseSingle');
+            var useSet = document.getElementById('UseSet');
+            var singleGroup = document.getElementById('SingleMaterialGroup');
+            var setGroup = document.getElementById('MaterialSetGroup');
+            var materialSetSelect = document.getElementById('MaterialSetSelect');
+            var locationGroup = document.getElementById('LocationGroup');
+            var locationHint = document.getElementById('LocationHint');
+            var materialSetIdHidden = document.getElementById('MaterialSetId');
+            function toggleOutputType() {
+                var isSet = useSet && useSet.checked;
+                if (singleGroup) singleGroup.classList.toggle('hidden', isSet);
+                if (setGroup) setGroup.classList.toggle('hidden', !isSet);
+                if (materialSetIdHidden) materialSetIdHidden.value = isSet && materialSetSelect ? (materialSetSelect.value || '') : '';
+                if (locationGroup) {
+                    // For sets, location is optional and only needed when a material has multiple locations.
+                    locationGroup.classList.toggle('opacity-60', isSet);
+                }
+                if (isSet && materialSetSelect && materialSetSelect.value) {
+                    var locSelect = document.getElementById('LocationId');
+                    if (locSelect && stockData.length) {
+                        var locs = {};
+                        stockData.forEach(function(s) {
+                            var locId = s.locationId != null ? s.locationId : s.LocationId;
+                            var code = s.locationCode || s.LocationCode || '';
+                            if (locId && !locs[locId]) locs[locId] = code;
+                        });
+                        locSelect.innerHTML = '<option value="">— Select location —</option>';
+                        Object.keys(locs).forEach(function(lid) {
+                            var opt = document.createElement('option');
+                            opt.value = lid;
+                            opt.textContent = locs[lid];
+                            locSelect.appendChild(opt);
+                        });
+                    }
+                } else if (!isSet && hidden.value) {
+                    updateLocationDropdown(parseInt(hidden.value, 10));
+                } else {
+                    var locSelect = document.getElementById('LocationId');
+                    if (locSelect) locSelect.innerHTML = '<option value="">— Select material or set first —</option>';
+                }
+            }
+            if (useSingle) useSingle.addEventListener('change', toggleOutputType);
+            if (useSet) useSet.addEventListener('change', toggleOutputType);
+            if (materialSetSelect) {
+                materialSetSelect.addEventListener('change', function() {
+                    if (materialSetIdHidden) materialSetIdHidden.value = this.value || '';
+                    toggleOutputType();
+                });
+            }
+            toggleOutputType();
+        })();
+    </script>
+}

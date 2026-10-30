@@ -1,0 +1,93 @@
+@page
+@model ManufacturingTimeTracking.Pages.Templates.IndexModel
+@{
+    ViewData["Title"] = "Process Templates";
+}
+
+<style>
+    .page-dark { background: #050915; color: #f8fafc; font-weight: 300; }
+    .card-dark {
+        background: rgba(10,15,31,0.92);
+        border: 1px solid rgba(59,130,246,0.45);
+        box-shadow: 0 0 24px rgba(59,130,246,0.28), 0 0 48px rgba(59,130,246,0.18);
+        border-radius: 18px;
+    }
+    .btn-glow {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+        background: #0b1224;
+        color: #f8fafc;
+    }
+    .table-dark thead { background: rgba(30,41,59,0.75); }
+    .table-dark th { color: #000; }
+    .table-dark td { color: #e2e8f0; }
+    .table-dark tr:hover { background: rgba(51,65,85,0.35); }
+</style>
+
+<div class="animate-fade-in page-dark p-4">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-semibold text-white">Process Templates</h1>
+        @if (User.IsInRole("Admin") || User.IsInRole("Supervisor") || User.IsInRole("Operator"))
+        {
+            <a asp-page="Create" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl btn-glow font-medium hover:bg-slate-900 transition-all duration-200 w-fit">Create New Template</a>
+        }
+    </div>
+
+    <div class="card-dark overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-700 table-fixed w-full table-dark">
+                <thead>
+                    <tr>
+                        <th class="px-6 w-2/12 py-4 text-center text-xs font-semibold uppercase tracking-wider">Model</th>
+                        <th class="px-6 w-3/12 py-4 text-center text-xs font-semibold uppercase tracking-wider">Name</th>
+                        <th class="px-6 w-3/12 py-4 text-center text-xs font-semibold uppercase tracking-wider">Variant (code)</th>
+                        <th class="px-6 w-1/12 py-4 text-center text-xs font-semibold uppercase tracking-wider">Phases</th>
+                        <th class="px-6 w-1/12 py-4 text-center text-xs font-semibold uppercase tracking-wider">Steps</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    @foreach (var template in Model.ProcessTemplates)
+                    {
+                        <tr class="transition-colors duration-150">
+                            <td class="px-6 py-4 w-2/12 text-center text-slate-200">@template.MachineModelId</td>
+                            <td class="px-6 py-4 w-3/12 text-center font-medium text-white">@(Model.MachineModelNames.ContainsKey(template.MachineModelId) ? Model.MachineModelNames[template.MachineModelId] : $"ID: {template.MachineModelId}")</td>
+                            <td class="px-6 py-4 w-3/12 text-center text-slate-200">
+                                @if (Model.MachineVariants.ContainsKey(template.MachineVariantId))
+                                {
+                                    var variant = Model.MachineVariants[template.MachineVariantId];
+                                    if (!string.IsNullOrEmpty(variant.Code))
+                                    {
+                                        <text>@variant.Name (<span class="text-red-300 font-medium">@variant.Code</span>)</text>
+                                    }
+                                    else
+                                    {
+                                        <text>@variant.Name</text>
+                                    }
+                                }
+                                else
+                                {
+                                    <text>ID: @template.MachineVariantId</text>
+                                }
+                            </td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@template.Phases.Count</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@template.Phases.Sum(p => p.Steps.Count)</td>
+                            <td class="px-6 py-4 text-center flex items-center justify-center gap-2 flex-wrap">
+                                @if (User.IsInRole("Admin") || User.IsInRole("Supervisor") || User.IsInRole("Operator"))
+                                {
+                                    <a asp-page="./Edit" asp-route-id="@template.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-slate-900">Edit</a>
+                                    <a asp-page="./Delete" asp-route-id="@template.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-red-500 text-red-300 text-sm font-medium hover:bg-red-900/30">Delete</a>
+                                }
+                                else
+                                {
+                                    <span class="text-slate-400 text-sm">View only</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="_Pagination" model="Model.Pagination" />
+    </div>
+</div>

@@ -1,0 +1,176 @@
+@model IEnumerable<ManufacturingTimeTracking.Models.Inventory.Location>
+@{
+    ViewData["Title"] = "Locations";
+    var zones = (IEnumerable<string>)(ViewBag.Zones ?? new List<string>());
+    var zone = (string)(ViewBag.Zone ?? "");
+}
+<style>
+    .time-report-surface {
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.08), transparent 35%),
+                    radial-gradient(circle at 80% 0%, rgba(244,114,182,0.08), transparent 30%),
+                    #0a0f1f;
+        color: #f8fafc;
+        font-weight: 300;
+        border: 1px solid rgba(56,189,248,0.45);
+        box-shadow: 0 0 30px rgba(56,189,248,0.25), 0 0 60px rgba(56,189,248,0.12);
+    }
+    .time-report-panel {
+        background: rgba(15,23,42,0.9);
+        border: 1px solid rgba(125,211,252,0.35);
+        box-shadow: 0 0 22px rgba(125,211,252,0.2);
+    }
+    .time-report-heading {
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+    .time-report-text { color: #e2e8f0; }
+    .table-report th { color: #e2e8f0 !important; }
+    .table-header-luminous {
+        background: rgba(8,15,32,0.95);
+        box-shadow: 0 0 18px rgba(56,189,248,0.35), 0 0 32px rgba(56,189,248,0.2) inset;
+    }
+    .btn-outline-luminous {
+        background: rgba(2,6,23,0.6);
+        color: #ffffff;
+        border: 1px solid rgba(59,130,246,0.55);
+        box-shadow: 0 8px 32px rgba(59,130,246,0.12), 0 0 18px rgba(59,130,246,0.12) inset;
+        transition: box-shadow .18s ease, border-color .12s ease, transform .08s ease;
+        font-weight: 600;
+        padding-left: 1.25rem; padding-right: 1.25rem;
+    }
+    .btn-outline-luminous:hover {
+        border-color: rgba(59,130,246,0.9);
+        box-shadow: 0 10px 40px rgba(59,130,246,0.26), 0 0 36px rgba(59,130,246,0.18) inset;
+        transform: translateY(-2px);
+    }
+    .btn-danger {
+        border: 1px solid rgba(248,113,113,0.8);
+        color: #fecaca;
+        background: rgba(15,23,42,0.65);
+    }
+    .btn-danger:hover { background: rgba(127,29,29,0.45); }
+    .action-buttons { display: inline-flex; gap: 0.5rem; justify-content: center; }
+</style>
+
+<div class="animate-fade-in">
+    <div class="time-report-surface rounded-3xl p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl time-report-heading">Locations (XY)</h1>
+        <div class="flex gap-2">
+            <form method="post" asp-action="DeleteAll" class="inline">
+                <input type="hidden" name="zone" value="@zone" />
+                <button type="submit" class="inline-flex items-center px-4 py-2.5 rounded-xl btn-danger" onclick="return confirm('Delete ALL @(string.IsNullOrWhiteSpace(zone) ? "" : zone + " ")locations? Related stock data will be removed. This cannot be undone.')">Delete all@(string.IsNullOrWhiteSpace(zone) ? "" : $" ({zone})")</button>
+            </form>
+            <a class="inline-flex items-center px-4 py-2.5 rounded-xl btn-outline-luminous" asp-action="BulkGenerate">Bulk generate</a>
+            <a class="inline-flex items-center px-5 py-2.5 rounded-xl btn-outline-luminous" asp-action="Create">New</a>
+        </div>
+    </div>
+
+    <form method="get" class="mb-6 flex flex-wrap gap-4 items-end">
+        <div class="min-w-[180px]">
+            <label class="block text-sm font-medium text-slate-200 mb-1.5">Zone</label>
+            <select class="w-full px-4 py-2.5 rounded-xl border border-slate-600 bg-slate-900/70 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30" name="zone">
+                <option value="">(all)</option>
+                @foreach (var z in zones)
+                {
+                    <option value="@z" selected="@(z == zone)">@z</option>
+                }
+            </select>
+        </div>
+        <button type="submit" class="px-5 py-2.5 rounded-xl btn-outline-luminous">Filter</button>
+    </form>
+
+    <div class="time-report-panel rounded-2xl overflow-hidden mb-6">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-700 table-fixed w-full text-xs table-report">
+                <thead class="table-header-luminous">
+                    <tr>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Code</th>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Zone</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">X</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Y</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Z</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Cap.</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Blocked</th>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700">
+                    @foreach (var l in Model)
+                    {
+                        <tr class="transition-colors duration-150 hover:bg-slate-800/40">
+                            <td class="px-6 py-4 w-2/12 text-center"><code class="px-2 py-1 rounded bg-slate-900/70 text-slate-100 text-sm">@l.Code</code></td>
+                            <td class="px-6 py-4 w-2/12 text-center text-white">@l.Zone</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@l.X</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@l.Y</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@(l.Z?.ToString() ?? "—")</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@l.Type</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@l.CapacityUnits</td>
+                            <td class="px-6 py-4 w-1/12 text-center"><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium @(l.IsBlocked ? "bg-red-900/40 text-red-200" : "bg-slate-900/70 text-slate-200")">@(l.IsBlocked ? "Yes" : "No")</span></td>
+                            <td class="px-6 py-4 w-2/12 text-center">
+                                <div class="action-buttons">
+                                    <a class="inline-flex items-center px-3 py-1.5 rounded-lg btn-outline-luminous text-sm" asp-action="Details" asp-route-id="@l.Id">Details</a>
+                                    <button type="button" class="inline-flex items-center px-3 py-1.5 rounded-lg btn-outline-luminous text-sm" data-modal-show="locationQrModal" data-qr-url="@Url.Action("Qr", "Locations", new { id = l.Id })">QR</button>
+                                    <form method="post" asp-action="Delete" asp-route-id="@l.Id" class="inline" onsubmit="return confirm('Delete location @l.Code?');">
+                                        <button type="submit" class="inline-flex items-center justify-center w-10 h-10 rounded-lg btn-danger" aria-label="Delete">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" /></svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="p-4 rounded-xl bg-slate-900/70 border border-slate-700 text-slate-200 text-sm">
+        Tip: print the QR for each location and stick it on the shelf. For putaway, the operator scans the location and the item tag. Use type "Workstation" for production stations so items can be moved from warehouse to production.
+    </div>
+    @{
+        var pagination = ViewBag.Pagination as ManufacturingTimeTracking.Models.PaginationInfo;
+    }
+    @if (pagination != null)
+    {
+        <partial name="~/Pages/Shared/_Pagination.cshtml" model="pagination" />
+    }
+    </div>
+</div>
+
+<!-- QR code modal -->
+<div class="tw-modal fixed inset-0 z-[100] hidden" id="locationQrModal" role="dialog" aria-labelledby="locationQrModalTitle" aria-modal="true">
+    <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <h2 class="text-lg font-semibold text-slate-800" id="locationQrModalTitle">Location QR Code</h2>
+            <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+        </div>
+        <div class="text-center p-4">
+            <img id="locationQrImage" src="" alt="QR Code" class="mx-auto max-w-full" />
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    document.querySelectorAll('[data-modal-show="locationQrModal"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var url = this.getAttribute('data-qr-url');
+            var img = document.getElementById('locationQrImage');
+            if (url && img) img.src = url;
+        });
+    });
+    var locationQrModal = document.getElementById('locationQrModal');
+    if (locationQrModal) {
+        new MutationObserver(function() {
+            if (locationQrModal.classList.contains('hidden')) {
+                var img = document.getElementById('locationQrImage');
+                if (img) img.src = '';
+            }
+        }).observe(locationQrModal, { attributes: true, attributeFilter: ['class'] });
+    }
+</script>
+}

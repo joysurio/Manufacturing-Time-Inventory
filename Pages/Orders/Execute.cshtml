@@ -1,0 +1,645 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.ExecuteModel
+@using ManufacturingTimeTracking.Data
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@inject ApplicationDbContext Context
+@{
+    ViewData["Title"] = "Execute Manufacturing";
+    var workstations = await Context.Workstations.Where(w => w.Active).OrderBy(w => w.Name).ToListAsync();
+    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    var stepsClockInRequiredMessage = TempData["StepsClockInRequired"] as string;
+}
+
+<div class="animate-fade-in">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Execute Manufacturing</h1>
+    <div class="mb-6">
+        <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">Back to Orders</a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-slate-800 mb-4">Order Information</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><dt class="text-sm font-medium text-slate-500">External Ref</dt><dd class="font-medium text-slate-800">@Model.BuildOrder.ExternalRef</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Serial Number</dt><dd class="font-medium text-slate-800">@Model.BuildOrder.SerialNumber</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Model</dt><dd class="font-medium text-slate-800">@Model.MachineModelName</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Variant</dt><dd class="font-medium text-slate-800">@Model.MachineVariantName</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Status</dt><dd class="font-medium text-slate-800">@Model.BuildOrder.Status</dd></div>
+        </dl>
+    </div>
+
+    @if (Model.CurrentExecution == null)
+    {
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-slate-800 mb-2">Ready to Start Manufacturing</h2>
+            <p class="text-slate-600 mb-4">Click the button below to start manufacturing. This will create a snapshot of the process template.</p>
+            <form method="post" asp-page-handler="StartManufacturing">
+                <input type="hidden" name="orderId" value="@Model.BuildOrder.Id" />
+                <button type="submit" class="px-6 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transition-all duration-200 text-lg">Start Manufacturing</button>
+            </form>
+        </div>
+    }
+    else
+    {
+        <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+            <strong>Manufacturing in Progress</strong> — Started at @Model.CurrentExecution.StartedAt.ToString("g")
+        </div>
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium text-slate-600">Step filter:</span>
+            <a asp-page="./Execute" asp-route-id="@Model.BuildOrder.Id" asp-route-stepFilter="All" asp-route-showHidden="@Model.ShowHidden" class="px-3 py-1.5 rounded-lg text-sm font-medium @(Model.StepFilter == "All" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">All steps</a>
+            <a asp-page="./Execute" asp-route-id="@Model.BuildOrder.Id" asp-route-stepFilter="Pending" asp-route-showHidden="@Model.ShowHidden" class="px-3 py-1.5 rounded-lg text-sm font-medium @(Model.StepFilter == "Pending" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Pending</a>
+            <a asp-page="./Execute" asp-route-id="@Model.BuildOrder.Id" asp-route-stepFilter="InProgress" asp-route-showHidden="@Model.ShowHidden" class="px-3 py-1.5 rounded-lg text-sm font-medium @(Model.StepFilter == "InProgress" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">In progress</a>
+            <a asp-page="./Execute" asp-route-id="@Model.BuildOrder.Id" asp-route-stepFilter="Paused" asp-route-showHidden="@Model.ShowHidden" class="px-3 py-1.5 rounded-lg text-sm font-medium @(Model.StepFilter == "Paused" ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Paused</a>
+            <a asp-page="./Execute" asp-route-id="@Model.BuildOrder.Id" asp-route-stepFilter="Completed" asp-route-showHidden="@Model.ShowHidden" class="px-3 py-1.5 rounded-lg text-sm font-medium @(Model.StepFilter == "Completed" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200")">Completed</a>
+            <a asp-page="./Execute" asp-route-id="@Model.BuildOrder.Id" asp-route-stepFilter="@Model.StepFilter" asp-route-showHidden="@(Model.ShowHidden ? "false" : "true")" data-requires-responsable="true" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">@(Model.ShowHidden ? "Hide hidden" : "Show hidden")</a>
+        </div>
+
+        @if (Model.ActiveInterruptions.Any())
+        {
+            <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                <h3 class="text-sm font-semibold text-amber-800 mb-2">Active interruptions (this order)</h3>
+                <ul class="space-y-1.5 text-sm text-amber-900">
+                    @foreach (var pi in Model.ActiveInterruptions)
+                    {
+                        <li class="flex flex-wrap gap-2 items-start">
+                            <span class="font-medium">@pi.Category.ToString()</span>
+                            <span>—</span>
+                            <span>@pi.Notes</span>
+                            <span class="text-amber-600">(@pi.StartTime.ToString("g"))</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+    @foreach (var phase in Model.CurrentExecution.Phases.OrderBy(p => p.SortOrder))
+    {
+        var stepsInPhase = phase.Steps.OrderBy(s => s.SortOrder).ToList();
+        var visibleSteps = stepsInPhase.Where(s => (Model.ShowHidden || !Model.IsStepHidden(s)) && (
+            Model.StepFilter == "All"
+            || (Model.StepFilter == "Pending" && s.State == "Pending")
+            || (Model.StepFilter == "Paused" && s.State == "Paused")
+            || (Model.StepFilter == "InProgress" && s.State == "InProgress")
+            || (Model.StepFilter == "Completed" && s.State == "Done"))).ToList();
+        if (visibleSteps.Count == 0) { continue; }
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-4 mb-4">
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
+                <h2 class="text-base font-semibold text-slate-800">@phase.Name</h2>
+                @if (User.IsInRole("Admin") || User.IsInRole("Supervisor") || User.IsInRole("Operator"))
+                {
+                    <button type="button" class="px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 text-sm font-medium hover:bg-blue-50" data-requires-responsable="true" data-modal-show="addStepModal@(phase.Id)">
+                        + Add Step
+                    </button>
+                }
+            </div>
+            <div>
+                @foreach (var step in visibleSteps)
+                {
+
+                    var nowUtc = DateTime.UtcNow;
+                    var totalSeconds = step.Runs.Sum(r =>
+                        r.FinishedAt != null
+                            ? (r.DurationSeconds ?? 0)
+                            : Math.Max(0, (int)(nowUtc - r.StartedAt).TotalSeconds));
+                    var timeSpan = TimeSpan.FromSeconds(totalSeconds);
+
+                    var userActiveRun = step.Runs.FirstOrDefault(r => r.FinishedAt == null && r.UserId == currentUserId);
+                    var activeRuns = step.Runs
+                        .Where(r => r.FinishedAt == null)
+                        .OrderBy(r => r.StartedAt)
+                        .ToList();
+                    var completedRuns = step.Runs.Where(r => r.FinishedAt != null).OrderBy(r => r.StartedAt).ToList();
+                    var isDone = step.State == "Done";
+                    var stepBlockClass = step.State == "Skipped" ? "border-amber-300 bg-amber-50/50" 
+                        : isDone ? "border-emerald-500 bg-emerald-100 shadow-sm" 
+                        : step.State == "InProgress" ? "border-blue-300 bg-blue-50/30" 
+                        : step.State == "Paused" ? "border-amber-200 bg-amber-50/40" 
+                        : "border-slate-100 bg-slate-50/50";
+                    var isHiddenVisual = Model.IsStepHidden(step);
+                    // If hidden steps are being shown, visually mark them (reduced opacity and dashed border)
+                    if (isHiddenVisual && Model.ShowHidden)
+                    {
+                        // Shade the entire step in light gray to indicate hidden status
+                        stepBlockClass += " bg-gray-100 border-gray-200";
+                    }
+                    <div class="rounded-xl border p-0 mb-2 overflow-hidden @stepBlockClass">
+                        <div class="flex flex-col md:flex-row md:gap-0">
+                            <div class="flex-1 md:min-w-[240px] md:max-w-[280px] p-3 md:p-3 rounded-t-xl md:rounded-t-none md:rounded-l-xl bg-sky-50/80 border-b md:border-b-0 md:border-r border-sky-100/80">
+                                <div class="flex items-start gap-2 mb-1.5">
+                                    <span class="inline-flex items-center justify-center w-7 h-7 shrink-0 rounded-full bg-slate-200/90 text-slate-600 text-xs font-semibold border border-slate-200">@step.SortOrder</span>
+                                    <div class="min-w-0 flex-1">
+                                        <h3 class="font-semibold text-slate-800 text-base leading-tight">@step.Title
+                                            @if (Model.ShowHidden && Model.IsStepHidden(step))
+                                            {
+                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-slate-800 border border-gray-300">Oculto</span>
+                                            }
+                                        </h3>
+                                        @if (step.State == "Skipped")
+                                        {
+                                            <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200/60">Skipped</span>
+                                        }
+                                        else if (step.State == "Done")
+                                        {
+                                            <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-200 text-emerald-900 border border-emerald-300">Done</span>
+                                        }
+                                        else if (step.State == "InProgress")
+                                        {
+                                            <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200/60">In Progress</span>
+                                        }
+                                        else if (step.State == "Paused")
+                                        {
+                                            <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200/60">Paused</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700 border border-sky-200/60">Pending</span>
+                                        }
+                                    </div>
+                                </div>
+                                <p class="text-slate-500 text-xs leading-snug break-words line-clamp-2 mb-1.5"
+                                title="@step.Instructions">
+                                    @(step.Instructions.Length > 120 ? step.Instructions.Substring(0, 120) + "…" : step.Instructions)
+                                </p>
+                                <div class="text-xs pt-1.5 border-t border-sky-100/80">
+                                    <span class="font-semibold text-slate-600">Total Time:</span>
+                                        @if (totalSeconds > 0)
+                                    {
+                                        <span class="text-slate-800 font-medium ml-1">@timeSpan.ToString(@"hh\:mm\:ss")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-slate-400 ml-1">—</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="flex-1 p-3 md:p-3">
+                                @if (!string.IsNullOrEmpty(step.SkipReason))
+                                {
+                                    <div class="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs mb-1.5">
+                                        <strong>Skip Reason:</strong> @step.SkipReason
+                                    </div>
+                                }
+
+                                    @if (completedRuns.Any() || activeRuns.Any())
+                                    {
+                                        <div class="mb-1.5 flex flex-wrap gap-1 items-center">
+                                            <strong class="text-slate-600 text-xs mr-1">Runs:</strong>
+                                            @foreach (var run in completedRuns)
+                                            {
+                                                var runTime = run.DurationSeconds.HasValue ? TimeSpan.FromSeconds(run.DurationSeconds.Value) : TimeSpan.Zero;
+                                                var userLabel = Model.StepRunUserDisplayNames.TryGetValue(run.UserId ?? string.Empty, out var uname)
+                                                    ? uname
+                                                    : (string.IsNullOrEmpty(run.UserId) ? "Unknown" : run.UserId);
+                                                <span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
+                                                    @userLabel — @runTime.ToString(@"mm\:ss")
+                                                    @if (run.Workstation != null)
+                                                    {
+                                                        <text> (@run.Workstation.Name)</text>
+                                                    }
+                                                </span>
+                                            }
+                                            @foreach (var run in activeRuns)
+                                            {
+                                                var elapsedSeconds = Math.Max(0, (int)(nowUtc - run.StartedAt).TotalSeconds);
+                                                var elapsedTime = TimeSpan.FromSeconds(elapsedSeconds);
+
+                                                var userLabel = Model.StepRunUserDisplayNames.TryGetValue(run.UserId ?? string.Empty, out var uname)
+                                                    ? uname
+                                                    : (string.IsNullOrEmpty(run.UserId) ? "Unknown" : run.UserId);
+
+                                                <span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                                                    @userLabel — @elapsedTime.ToString(@"mm\:ss")
+                                                    @if (run.Workstation != null)
+                                                    {
+                                                        <text> (@run.Workstation.Name)</text>
+                                                    }
+                                                </span>
+                                            }
+                                        </div>
+                                    }
+
+                                    @if (step.Evidence.Any())
+                                    {
+                                        <div class="mb-1.5">
+                                            <strong class="text-slate-600 text-xs">📚 Reference Instructions:</strong>
+                                            <div class="flex flex-wrap gap-1.5 mt-0.5">
+                                                @foreach (var evidence in step.Evidence.OrderByDescending(e => e.CreatedAt))
+                                                {
+                                                    @if (evidence.Media.Type == "Image" && !string.IsNullOrEmpty(evidence.Media.UrlOrPath))
+                                                    {
+                                                        <div class="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200 shrink-0">
+                                                            <img src="~/uploads/@evidence.Media.UrlOrPath" 
+                                                                 class="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                                 data-bs-toggle="modal" 
+                                                                 data-bs-target="#instructionViewModal@(evidence.Id)"
+                                                                 alt="Instruction" />
+                                                            <span class="absolute bottom-0 right-0 bg-slate-800 text-white text-[10px] px-1 rounded-tl">@evidence.CreatedAt.ToString("HH:mm")</span>
+                                                        </div>
+                                                    }
+                                                    else if (evidence.Media.Type == "Video" && !string.IsNullOrEmpty(evidence.Media.UrlOrPath))
+                                                    {
+                                                        <div class="relative w-28 h-20 rounded-lg border border-slate-200 bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors shrink-0"
+                                                             data-bs-toggle="modal" 
+                                                             data-bs-target="#instructionViewModal@(evidence.Id)">
+                                                            <span class="text-2xl">🎥</span>
+                                                            <span class="text-slate-500 text-xs">Video</span>
+                                                            <span class="absolute bottom-0 right-0 bg-slate-800 text-white text-[10px] px-1 rounded-tl">@evidence.CreatedAt.ToString("HH:mm")</span>
+                                                        </div>
+                                                    }
+                                                    else if (!string.IsNullOrEmpty(evidence.Note))
+                                                    {
+                                                        <div class="max-w-[200px] rounded-lg border border-slate-200 p-2 cursor-pointer hover:bg-slate-50 transition-colors" 
+                                                             data-bs-toggle="modal" 
+                                                             data-bs-target="#instructionViewModal@(evidence.Id)">
+                                                            <span class="text-slate-500 text-xs">📝 Instruction</span>
+                                                            <p class="text-slate-700 text-sm mt-0.5">@(evidence.Note.Length > 50 ? evidence.Note.Substring(0, 50) + "..." : evidence.Note)</p>
+                                                            <span class="text-slate-400 text-[10px]">@evidence.CreatedAt.ToString("HH:mm")</span>
+                                                        </div>
+                                                    }
+                                                    
+                                                    <!-- Instruction View Modal -->
+
+                                                    <div class="tw-modal fixed inset-0 z-[100] hidden" id="instructionViewModal@(evidence.Id)" tabindex="-1">
+                                                        <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+                                                        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+                                                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                                                                    <h5 class="text-lg font-semibold text-slate-800">📚 Reference Instruction</h5>
+                                                                    <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+                                                                </div>
+                                                                <div class="p-6">
+                                                                    @if (evidence.Media.Type == "Image" && !string.IsNullOrEmpty(evidence.Media.UrlOrPath))
+                                                                    {
+                                                                        <img src="~/uploads/@evidence.Media.UrlOrPath" class="img-fluid mb-2" alt="Instruction" />
+                                                                    }
+                                                                    else if (evidence.Media.Type == "Video" && !string.IsNullOrEmpty(evidence.Media.UrlOrPath))
+                                                                    {
+                                                                        <video controls class="w-100 mb-2" style="max-height: 500px;">
+                                                                            <source src="/uploads/@evidence.Media.UrlOrPath" type="video/mp4">
+                                                                            Your browser does not support the video tag.
+                                                                        </video>
+                                                                    }
+                                                                    @if (!string.IsNullOrEmpty(evidence.Note))
+                                                                    {
+                                                                        <p><strong>Instruction:</strong> @evidence.Note</p>
+                                                                    }
+                                                                    <p class="text-slate-500 text-sm">Added: @evidence.CreatedAt.ToString("g")</p>
+                                                                    <div class="rounded-lg bg-blue-50 text-blue-800 py-2 px-3 text-sm mt-2">
+                                                                        <small>💡 This instruction helps future users understand how to perform this step.</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+
+                                </div>
+                                <div class="flex flex-wrap gap-1.5 items-start justify-end mt-2 md:mt-0 md:min-w-[180px] pt-2 pr-2">
+                                    @if (step.State == "Pending")
+                                    {
+                                        <a href="/Orders/StepView?stepExecId=@step.Id" target="_blank" class="px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 text-sm font-medium hover:bg-blue-50">Preview</a>
+                                        <button type="button" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700" data-modal-show="startModal@(step.Id)">Start</button>
+                                        @if (step.AllowSkip)
+                                        {
+                                            <button type="button" class="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600" data-modal-show="skipModal@(step.Id)">Skip</button>
+                                        }
+                                        @if (User.IsInRole("Admin") || User.IsInRole("Supervisor") || User.IsInRole("Operator"))
+                                        {
+                                            <form method="post" asp-page-handler="DeleteStepFromOrder" class="inline" onsubmit="return confirm('Remove this step from the order and from the template?');">
+                                                <input type="hidden" name="stepExecId" value="@step.Id" />
+                                                <button type="submit" class="px-3 py-1.5 rounded-lg border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50">Remove step</button>
+                                            </form>
+                                        }
+                                    }
+                                    else if (step.State == "InProgress")
+                                    {
+                                        <a href="/Orders/StepView?stepExecId=@step.Id" target="_blank" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">View Full Screen</a>
+                                        @if (userActiveRun != null)
+                                        {
+                                            <button type="button" class="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600" data-modal-show="logInterruptionPauseModal@(step.Id)">Pause</button>
+                                            <form method="post" asp-page-handler="StopStep" class="inline" style="display:inline;">
+                                                <input type="hidden" name="stepExecId" value="@step.Id" />
+                                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">Complete</button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            // No active run for the current user, but other users may still be working.
+                                            <button type="button" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700" data-modal-show="startModal@(step.Id)">Start</button>
+                                        }
+                                    }
+                                    else if (step.State == "Paused")
+                                    {
+                                        <form method="post" asp-page-handler="StartStep" class="inline">
+                                            <input type="hidden" name="stepExecId" value="@step.Id" />
+                                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">Resume</button>
+                                        </form>
+                                    }
+                                    else if (step.State == "Skipped")
+                                    {
+                                        <form method="post" asp-page-handler="RestartStep" class="inline">
+                                            <input type="hidden" name="stepExecId" value="@step.Id" />
+                                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">Restart step</button>
+                                        </form>
+                                    }
+                                    else if (step.State == "Done")
+                                    {
+                                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium mr-2">Completed</span>
+                                        @if (User.IsInRole("Admin") || User.IsInRole("Supervisor") || User.IsInRole("Operator"))
+                                        {
+                                            <button type="button"
+                                                    class="px-3 py-1.5 rounded-lg border border-amber-500 text-amber-700 text-sm font-medium hover:bg-amber-50"
+                                                    data-modal-show="reopenStepModal@(step.Id)">
+                                                Reopen step
+                                            </button>
+                                        }
+                                    }
+                                    @if (User.IsInRole("Admin") || User.IsInRole("Supervisor") || User.IsInRole("Operator"))
+                                    {
+                                        <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50" data-modal-show="instructionModal@(step.Id)">📚 Add Instruction</button>
+                                    }
+
+                                    <!-- Start/Rework Modal -->
+                                    <div class="tw-modal fixed inset-0 z-[100] hidden" id="startModal@(step.Id)" tabindex="-1">
+                                        <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+                                        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+                                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                                                    <h5 class="text-lg font-semibold text-slate-800">Start Step</h5>
+                                                    <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+                                                </div>
+                                                <form method="post" asp-page-handler="StartStepWithWorkstation">
+                                                    <div class="p-6">
+                                                        <input type="hidden" name="stepExecId" value="@step.Id" />
+                                                        <div class="mb-3">
+                                                            <label class="block text-sm font-medium text-slate-700 mb-1">Workstation (Optional)</label>
+                                                            <select name="workstationId" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                                                <option value="">None</option>
+                                                                @foreach (var ws in workstations)
+                                                                {
+                                                                    <option value="@ws.Id">@ws.Name</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-200">
+                                                        <button type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors" data-modal-close>Cancel</button>
+                                                        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">Start</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+
+                                    <!-- Skip Modal -->
+                                    <div class="tw-modal fixed inset-0 z-[100] hidden" id="skipModal@(step.Id)" tabindex="-1">
+                                        <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+                                        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+                                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                                                    <h5 class="text-lg font-semibold text-slate-800">Skip Step</h5>
+                                                    <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+                                                </div>
+                                                <form method="post" asp-page-handler="SkipStep">
+                                                    <div class="p-6">
+                                                        <input type="hidden" name="stepExecId" value="@step.Id" />
+                                                        <div class="mb-3">
+                                                            <label class="block text-sm font-medium text-slate-700 mb-1">Reason for skipping <span class="text-danger">*</span></label>
+                                                            <textarea name="skipReason" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3" required></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-200">
+                                                        <button type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors" data-modal-close>Cancel</button>
+                                                        <button type="submit" class="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">Skip Step</button>
+                                                    </div>
+                                                </form>
+                                        </div>
+                                    </div>
+
+                                    <!-- Reopen Step Modal (reason required) -->
+                                    <div class="tw-modal fixed inset-0 z-[110] hidden" id="reopenStepModal@(step.Id)" tabindex="-1">
+                                        <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+                                        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+                                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                                                <h5 class="text-lg font-semibold text-slate-800">Reopen Step</h5>
+                                                <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+                                            </div>
+                                            <form method="post" asp-page-handler="ReopenStep">
+                                                <div class="p-6">
+                                                    <input type="hidden" name="stepExecId" value="@step.Id" />
+                                                    <p class="text-slate-500 text-sm mb-3">
+                                                        You must provide a reason to reopen this completed step.
+                                                    </p>
+                                                    <div class="mb-3">
+                                                        <label class="block text-sm font-medium text-slate-700 mb-1">Reason <span class="text-red-500">*</span></label>
+                                                        <textarea name="reopenReason" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:border-amber-500" rows="3" required placeholder="e.g. Quality issue found, missing part, rework required..."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-200">
+                                                    <button type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors" data-modal-close>Cancel</button>
+                                                    <button type="submit" class="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600">Reopen</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+
+                                    <!-- Instruction Upload Modal -->
+                                    <div class="tw-modal fixed inset-0 z-[100] hidden" id="instructionModal@(step.Id)" tabindex="-1">
+                                        <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+                                        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+                                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                                                    <h5 class="text-lg font-semibold text-slate-800">📚 Add Reference Instruction</h5>
+                                                    <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+                                                </div>
+                                                <form method="post" asp-page-handler="UploadEvidence" enctype="multipart/form-data">
+                                                    <div class="p-6">
+                                                        <div class="rounded-lg bg-blue-50 text-blue-800 py-2 px-3 text-sm mb-3">
+                                                            <small><strong>💡 Purpose:</strong> Add manuals, tutorials, or step-by-step instructions that help future users understand how to perform this step. You can upload images (e.g., pictures of needed tools) or videos, or add written instructions.</small>
+                                                        </div>
+                                                        <input type="hidden" name="stepExecId" value="@step.Id" />
+                                                        <div class="mb-3">
+                                                            <label class="block text-sm font-medium text-slate-700 mb-1">Image or Video</label>
+                                                            <input type="file" name="imageFile" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" accept="image/*,video/*" />
+                                                            <small class="text-slate-500 text-sm">Upload an image (e.g., picture of tools) or video tutorial</small>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="block text-sm font-medium text-slate-700 mb-1">Instruction / Description</label>
+                                                            <textarea name="note" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="4" placeholder="Describe the instruction, tutorial, or step-by-step guide. For example: 'Required tools: Screwdriver M4, Wrench 10mm. First, check the alignment, then...'"></textarea>
+                                                            <small class="text-slate-500 text-sm">Add detailed instructions that will help future users</small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-200">
+                                                        <button type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors" data-modal-close>Cancel</button>
+                                                        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">Add Instruction</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+
+                                    <!-- Log interruption (Pause) - mandatory before pausing (issue #10) -->
+                                    <div class="tw-modal fixed inset-0 z-[100] hidden" id="logInterruptionPauseModal@(step.Id)" tabindex="-1">
+                                        <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+                                        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+                                                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                                                    <h5 class="text-lg font-semibold text-slate-800">Log interruption</h5>
+                                                    <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+                                                </div>
+                                                <form method="post" asp-page-handler="LogInterruptionAndPauseStep">
+                                                    <div class="p-6">
+                                                        <p class="text-slate-500 text-sm mb-3">You must log why you are pausing this step before continuing.</p>
+                                                        <input type="hidden" name="stepExecId" value="@step.Id" />
+                                                        <div class="mb-3">
+                                                            <label class="block text-sm font-medium text-slate-700 mb-1">Notes <span class="text-danger">*</span></label>
+                                                            <textarea name="notes" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3" required placeholder="e.g. Waiting for parts, machine issue..."></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-200">
+                                                        <button type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors" data-modal-close>Cancel</button>
+                                                        <button type="submit" class="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">Log &amp; Pause</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+
+                                </div>
+                            </div>
+                        </div>
+                }
+                
+                <!-- Add Step Modal -->
+                <div class="tw-modal fixed inset-0 z-[100] hidden" id="addStepModal@(phase.Id)" role="dialog">
+                    <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+                    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-slate-200 z-10">
+                            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                                <h5 class="text-lg font-semibold text-slate-800">Add Step to @phase.Name</h5>
+                                <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" data-modal-close aria-label="Close">&times;</button>
+                            </div>
+                            <form method="post" asp-page-handler="AddStep">
+                                <div class="p-6">
+                                    <input type="hidden" name="phaseExecId" value="@phase.Id" />
+                                    <div class="mb-3">
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Step Title <span class="text-danger">*</span></label>
+                                        <input type="text" name="title" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Instructions</label>
+                                        <textarea name="instructions" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3"></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <input type="checkbox" name="allowSkip" id="allowSkip@(phase.Id)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" value="true" checked />
+                                            <label for="allowSkip@(phase.Id)" class="text-sm text-slate-700">Allow Skip</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-200">
+                                    <button type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors" data-modal-close>Cancel</button>
+                                    <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">Add Step</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+        </div>      
+    }
+}
+
+@if (!string.IsNullOrEmpty(stepsClockInRequiredMessage))
+{
+    <div class="tw-modal fixed inset-0 z-[120] hidden" id="clockInRequiredModal" role="dialog" aria-labelledby="clockInRequiredModalTitle" aria-modal="true">
+        <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-amber-200 z-10">
+            <div class="flex items-center justify-between p-3 bg-amber-50 border-b border-amber-200">
+                <h2 class="text-lg font-semibold text-amber-900" id="clockInRequiredModalTitle">Clock-in required</h2>
+                <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-amber-100" data-modal-close aria-label="Close">&times;</button>
+            </div>
+            <div class="p-3">
+                <p class="text-slate-700 mb-4">@stepsClockInRequiredMessage</p>
+                <form method="post" asp-page="/TimeTracking/Index" asp-page-handler="ClockIn" class="flex flex-wrap items-center gap-3">
+                    <input type="hidden" name="returnUrl" value="@Url.Page("/Orders/Execute", new { id = Model.BuildOrder.Id, stepFilter = Model.StepFilter })" />
+                    <button type="submit" class="p-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">Clock in now</button>
+                    <button type="button" class="p-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50" data-modal-close>Close</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var modalId = 'clockInRequiredModal';
+            var modalEl = document.getElementById(modalId);
+            if (!modalEl) return;
+            document.body.appendChild(modalEl);
+
+            if (window.showModal) {
+                window.showModal(modalId);
+                return;
+            }
+
+            modalEl.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+
+            var closeNodes = modalEl.querySelectorAll('[data-modal-close]');
+            var closeModal = function () {
+                modalEl.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            };
+            for (var i = 0; i < closeNodes.length; i++) {
+                closeNodes[i].addEventListener('click', closeModal);
+            }
+        })();
+    </script>
+}
+
+@{
+    var conflictTitle = TempData["ConflictStepTitle"] as string;
+    var conflictIdStr = TempData["ConflictStepExecId"] as string;
+    var pendingIdStr = TempData["PendingStepExecId"] as string;
+}
+@if (!string.IsNullOrEmpty(conflictTitle) && !string.IsNullOrEmpty(conflictIdStr) && !string.IsNullOrEmpty(pendingIdStr))
+{
+    <div class="tw-modal fixed inset-0 z-[100] hidden" id="taskConflictModal" role="dialog" aria-labelledby="taskConflictModalTitle" aria-modal="true">
+        <div class="fixed inset-0 bg-black/50" data-modal-close></div>
+        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-white border border-amber-200 z-10">
+                <div class="flex items-center justify-between px-6 py-4 bg-amber-50 border-b border-amber-200">
+                    <h2 class="text-lg font-semibold text-amber-800" id="taskConflictModalTitle">Task Already in Progress</h2>
+                    <button type="button" class="p-2 rounded-lg text-slate-500 hover:bg-amber-100" data-modal-close aria-label="Close">&times;</button>
+                </div>
+                <div class="p-6">
+                    <p class="text-slate-700 mb-4">You currently have <strong>"@conflictTitle"</strong> in progress. You cannot start a new task until the current one is paused or completed.</p>
+                    <p class="text-slate-500 text-sm">Choose an option below:</p>
+                </div>
+                <div class="flex flex-col gap-2 sm:flex-row flex-wrap px-6 py-4 border-t border-slate-200">
+                    <button type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors" data-modal-close>Cancel</button>
+                    <form method="post" asp-page-handler="CompleteConflictAndStart" class="inline">
+                        <input type="hidden" name="conflictStepExecId" value="@conflictIdStr" />
+                        <input type="hidden" name="pendingStepExecId" value="@pendingIdStr" />
+                        <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">Complete current &amp; start new</button>
+                    </form>
+                    <button type="button" class="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors" id="taskConflictPauseToggle">Pause current &amp; start new</button>
+                </div>
+                <div id="pauseConflictSection" class="hidden border-t border-slate-200 p-4 mx-6 mb-4">
+                    <form method="post" asp-page-handler="PauseConflictAndStart">
+                        <input type="hidden" name="conflictStepExecId" value="@conflictIdStr" />
+                        <input type="hidden" name="pendingStepExecId" value="@pendingIdStr" />
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Pause reason <span class="text-red-500">*</span></label>
+                            <textarea name="notes" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="2" required placeholder="e.g. Switching to higher priority task..."></textarea>
+                        </div>
+                        <button type="submit" class="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">Pause &amp; Start</button>
+                    </form>
+                </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var modalEl = document.getElementById('taskConflictModal');
+            if (modalEl) document.body.appendChild(modalEl);
+            var pauseToggle = document.getElementById('taskConflictPauseToggle');
+            var pauseSection = document.getElementById('pauseConflictSection');
+            if (pauseToggle && pauseSection) {
+                pauseToggle.addEventListener('click', function () {
+                    pauseSection.classList.toggle('hidden');
+                });
+            }
+            if (window.showModal) window.showModal('taskConflictModal');
+        })();
+    </script>
+}

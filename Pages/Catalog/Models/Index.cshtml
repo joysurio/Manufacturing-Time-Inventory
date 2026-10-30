@@ -1,0 +1,63 @@
+@page
+@model ManufacturingTimeTracking.Pages.Catalog.Models.IndexModel
+@{
+    ViewData["Title"] = "Machine Models";
+}
+
+<style>
+    .page-dark { background: #050915; color: #f8fafc; font-weight: 300; }
+    .card-dark {
+        background: rgba(10,15,31,0.92);
+        border: 1px solid rgba(59,130,246,0.45);
+        box-shadow: 0 0 24px rgba(59,130,246,0.28), 0 0 48px rgba(59,130,246,0.18);
+        border-radius: 18px;
+    }
+    .btn-glow {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+        background: #0b1224;
+        color: #f8fafc;
+    }
+    .table-dark thead { background: rgba(30,41,59,0.75); }
+    .table-dark th { color: #60a5fa; }
+    .table-dark td { color: #e2e8f0; }
+    .table-dark tr:hover { background: rgba(51,65,85,0.35); }
+</style>
+
+<div class="animate-fade-in page-dark">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-semibold text-white">Machine Models</h1>
+        <a asp-page="Create" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl btn-glow font-medium hover:bg-slate-900 transition-all duration-200 w-fit">Create New Model</a>
+    </div>
+
+    <div class="card-dark overflow-hidden max-w-4xl mx-auto">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-700 table-fixed table-dark">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-4 w-3/12 text-center text-xs font-semibold uppercase tracking-wider">Standard hours</th>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold uppercase tracking-wider">Variants</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    @foreach (var machineModel in Model.MachineModels)
+                    {
+                        <tr class="transition-colors duration-150">
+                            <td class="px-6 py-4 w-2/12 text-center font-medium text-white">@machineModel.Name</td>
+                            <td class="px-6 py-4 w-3/12 text-center text-slate-200">@machineModel.StandardHours.ToString("N2")</td>
+                            <td class="px-6 py-4 w-2/12 text-center text-slate-200">@machineModel.Variants.Count</td>
+                            <td class="px-6 py-4 text-center flex items-center justify-center gap-2 flex-wrap">
+                                <a asp-page="./Edit" asp-route-id="@machineModel.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-slate-900">Edit</a>
+                                <a asp-page="./Details" asp-route-id="@machineModel.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-500 text-slate-100 text-sm font-medium hover:bg-slate-800">Details</a>
+                                <a asp-page="./Delete" asp-route-id="@machineModel.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-red-500 text-red-300 text-sm font-medium hover:bg-red-900/30">Delete</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="_Pagination" model="Model.Pagination" />
+    </div>
+</div>

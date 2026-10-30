@@ -1,0 +1,659 @@
+@page
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model ManufacturingTimeTracking.Pages.Orders.ReportTimeByUserModel
+@{
+    ViewData["Title"] = "Time by User Report";
+}
+
+@{
+    var exportUrl = Url.Page("ReportTimeByUser", new { handler = "ExportCsv", UserIdFilter = Model.UserIdFilter, OrderIdFilter = Model.OrderIdFilter, StatusFilter = Model.StatusFilter, FromDate = Model.FromDate, ToDate = Model.ToDate });
+    var exportPdfUrl = Url.Page("ReportTimeByUser", new { handler = "ExportPdf", UserIdFilter = Model.UserIdFilter, OrderIdFilter = Model.OrderIdFilter, StatusFilter = Model.StatusFilter, FromDate = Model.FromDate, ToDate = Model.ToDate });
+}
+
+<style>
+    .time-report-surface {
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.08), transparent 35%),
+                    radial-gradient(circle at 80% 0%, rgba(244,114,182,0.08), transparent 30%),
+                    #0a0f1f;
+        color: #f8fafc;
+        font-weight: 300;
+        border: 1px solid rgba(56,189,248,0.45);
+        box-shadow: 0 0 30px rgba(56,189,248,0.25), 0 0 60px rgba(56,189,248,0.12);
+    }
+    .time-report-panel {
+        background: rgba(15,23,42,0.9);
+        border: 1px solid rgba(125,211,252,0.35);
+        box-shadow: 0 0 22px rgba(125,211,252,0.2);
+    }
+    .time-report-heading {
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+    .time-report-text { color: #e2e8f0; }
+    .table-scroll { max-height: 70vh; overflow-y: auto; overflow-x: auto; }
+    .table-report th { color: #000 !important; }
+    .btn-outline-luminous {
+        background: rgba(2,6,23,0.6); /* slightly dark fill to match edit button */
+        color: #ffffff;
+        border: 1px solid rgba(59,130,246,0.55);
+        box-shadow: 0 8px 32px rgba(59,130,246,0.12), 0 0 18px rgba(59,130,246,0.12) inset;
+        transition: box-shadow .18s ease, border-color .12s ease, transform .08s ease;
+        font-weight: 600;
+        padding-left: 1.25rem; padding-right: 1.25rem;
+    }
+    .btn-outline-luminous:hover {
+        border-color: rgba(59,130,246,0.9);
+        box-shadow: 0 10px 40px rgba(59,130,246,0.26), 0 0 36px rgba(59,130,246,0.18) inset;
+        transform: translateY(-2px);
+    }
+    /* Ensure selected/trigger text in searchable selects stays white and without shadow */
+    .select-trigger-text { color: #ffffff !important; text-shadow: none !important; }
+    .select-trigger { text-shadow: none; }
+    /* Make searchable-select trigger fully transparent and always show white text (override Tailwind utilities)
+       Use a more specific selector to ensure it overrides utility classes and focus/hover states. */
+    .searchable-select .select-trigger,
+    .searchable-select .select-trigger:hover,
+    .searchable-select .select-trigger:focus,
+    .searchable-select .select-trigger[aria-expanded="true"] {
+        background-color: transparent !important;
+        background-image: none !important;
+        color: #ffffff !important;
+        box-shadow: none !important;
+        outline: none !important;
+        -webkit-box-shadow: none !important;
+        text-shadow: none !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    .searchable-select .select-trigger .select-trigger-text { color: #ffffff !important; text-shadow: none !important; }
+    .searchable-select .select-trigger:hover { cursor: pointer; }
+    /* Animated border only (does not affect card fill) */
+    .border-draw { position: relative; }
+    .border-draw::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        z-index: 2;
+        /* draw just the border using border-image with a conic gradient */
+        border: 2px solid transparent;
+        border-image: conic-gradient(from 0deg, var(--border-color, #38bdf8), rgba(255,255,255,0.08), var(--border-color, #38bdf8)) 1;
+        transform-origin: 50% 50%;
+        animation: border-rotate 6s linear infinite;
+    }
+    .border-draw > * { position: relative; z-index: 1; }
+    @@keyframes border-rotate { to { transform: rotate(360deg); } }
+    /* no animated border */
+</style>
+
+<div class="animate-fade-in">
+    <div class="time-report-surface rounded-3xl p-6 text-slate-100">
+        <div class="mb-6">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h1 class="text-2xl time-report-heading leading-tight">Time by User Report</h1>
+                    <p class="time-report-text text-sm leading-snug">Tasks per user and time spent.</p>
+                </div>
+                @if (Model.Rows.Count > 0)
+                {
+                    <div class="flex items-center gap-3">
+                        <a href="@exportUrl" class="inline-flex items-center px-4 py-2 rounded-xl btn-outline-luminous text-sm font-medium">
+                            Download CSV (filtered)
+                        </a>
+                        <a href="@exportPdfUrl" class="inline-flex items-center px-4 py-2 rounded-xl btn-outline-luminous text-sm font-medium">
+                            Export PDF
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (Model.UserHoursKpis.Any())
+        {
+            var maxSeconds = Model.UserHoursKpis.Max(k => k.TotalSeconds);
+            var palette = new[] { "#ec4899", "#a3e635", "#22d3ee", "#f59e0b", "#d946ef", "#34d399", "#fb923c", "#38bdf8" };
+            <div class="time-report-panel rounded-2xl p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg time-report-heading">KPIs: Horas trabajadas por técnico</h2>
+                    <span class="text-xs text-slate-200">Total filtrado</span>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    @for (int i = 0; i < Model.UserHoursKpis.Count; i++)
+                    {
+                        var kpi = Model.UserHoursKpis[i];
+                        var percent = maxSeconds > 0 ? Math.Round((double)kpi.TotalSeconds * 100 / maxSeconds, 1) : 0;
+                        var colorHex = palette[i % palette.Length];
+                        var circleStyle = $"background: conic-gradient({colorHex} {percent}%, #0f172a {percent}%);";
+                        var cardStyle = $"border-color:{colorHex}; background:linear-gradient(135deg,{colorHex}33,#0f172a);";
+                        <div class="flex items-center gap-3 p-3 rounded-2xl border" style="@cardStyle">
+                            <div class="relative w-16 h-16 rounded-full flex items-center justify-center text-[11px] font-semibold text-white" style="@circleStyle">
+                                <div class="absolute inset-[5px] rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-medium text-slate-100">
+                                    @ReportTimeByUserModel.FormatDurationSummary(kpi.TotalSeconds)
+                                </div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-sm font-semibold text-white truncate" style=$"color:{colorHex}">@kpi.UserDisplayName</div>
+                                <div class="text-xs text-slate-200">@percent% del máximo</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (Model.MachineUserHoursKpis.Any())
+        {
+            var maxSecondsMachine = Model.MachineUserHoursKpis.Max(k => k.TotalSeconds);
+            var palette = new[] { "#38bdf8", "#f59e0b", "#34d399", "#d946ef", "#fb923c", "#22d3ee", "#a3e635", "#ec4899" };
+            var machineCards = Model.MachineUserHoursKpis.Take(12).ToList();
+            <div class="time-report-panel rounded-2xl p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg time-report-heading">KPIs: Horas por máquina y usuario</h2>
+                    <span class="text-xs text-slate-200">Top 12 (filtrado)</span>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    @for (int i = 0; i < machineCards.Count; i++)
+                    {
+                        var kpi = machineCards[i];
+                        var percent = maxSecondsMachine > 0 ? Math.Round((double)kpi.TotalSeconds * 100 / maxSecondsMachine, 1) : 0;
+                        var colorHex = palette[i % palette.Length];
+                        var circleStyle = $"background: conic-gradient({colorHex} {percent}%, #0f172a {percent}%);";
+                        var cardStyle = $"border-color:{colorHex}; background:linear-gradient(135deg,{colorHex}33,#0f172a);";
+                        <div class="flex items-center gap-3 p-3 rounded-2xl border" style="@cardStyle">
+                            <div class="relative w-16 h-16 rounded-full flex items-center justify-center text-[11px] font-semibold text-white" style="@circleStyle">
+                                <div class="absolute inset-[5px] rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-medium text-slate-100">
+                                    @ReportTimeByUserModel.FormatDurationSummary(kpi.TotalSeconds)
+                                </div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-sm font-semibold text-white truncate">@kpi.MachineModel</div>
+                                <div class="text-xs text-slate-200 truncate">@kpi.UserDisplayName</div>
+                                <div class="text-[11px] text-slate-300">@percent% del máximo</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (Model.MachineCompletionRows.Any())
+        {
+            <div class="time-report-panel rounded-2xl p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg time-report-heading">Máquinas finalizadas: tiempo total por usuario</h2>
+                    <span class="text-xs text-slate-200">Solo runs finalizados</span>
+                </div>
+                <div class="overflow-x-auto table-scroll">
+                    <table class="min-w-full divide-y divide-slate-700 text-xs table-report">
+                        <thead class="bg-slate-900/60">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Machine</th>
+                                <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">User</th>
+                                <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Tiempo total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700">
+                            @foreach (var row in Model.MachineCompletionRows)
+                            {
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="px-3 py-2 text-slate-100 font-medium whitespace-nowrap">@row.MachineModel</td>
+                                    <td class="px-3 py-2 text-slate-100">@row.UserDisplayName</td>
+                                    <td class="px-3 py-2 text-emerald-200 font-semibold">@ReportTimeByUserModel.FormatDuration(row.TotalSeconds)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @if (Model.MachineUserCompareRows.Any())
+        {
+            <div class="time-report-panel rounded-2xl p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg time-report-heading">Comparativa por máquina (runs finalizados)</h2>
+                    <span class="text-xs text-slate-200">Usuarios con la misma máquina</span>
+                </div>
+                <div class="overflow-x-auto table-scroll">
+                    <table class="min-w-full divide-y divide-slate-700 text-xs table-report">
+                        <thead class="bg-slate-900/60">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Machine</th>
+                                <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Usuarios (tiempo total)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700">
+                            @foreach (var row in Model.MachineUserCompareRows)
+                            {
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="px-3 py-2 text-slate-100 font-medium whitespace-nowrap">@row.MachineModel</td>
+                                    <td class="px-3 py-2 text-slate-100">
+                                        <div class="flex flex-wrap gap-2">
+                                            @foreach (var u in row.Users)
+                                            {
+                                                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-600 bg-slate-900/70 text-[12px] whitespace-nowrap">
+                                                    <strong class="text-blue-200">@u.UserDisplayName</strong>
+                                                    <span class="text-emerald-200 font-semibold">@ReportTimeByUserModel.FormatDuration(u.TotalSeconds)</span>
+                                                    <span class="text-slate-300">—</span>
+                                                    <span class="text-slate-100">€@u.CostEuros</span>
+                                                </span>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @if (Model.CompareRows.Any())
+        {
+            <div class="time-report-panel rounded-2xl p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg time-report-heading">Comparativa por usuario y máquina (misma tarea)</h2>
+                    <span class="text-xs text-slate-200">Promedios por tarea</span>
+                </div>
+                <div class="overflow-x-auto table-scroll">
+                    <table class="min-w-full divide-y divide-slate-700 text-xs table-report">
+                        <thead class="bg-slate-900/60">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Machine</th>
+                                <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Task</th>
+                                <th class="px-3 py-2 text-left font-semibold text-slate-200 uppercase tracking-wider">Usuarios (promedio · runs)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700">
+                            @foreach (var row in Model.CompareRows)
+                            {
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="px-3 py-2 text-slate-100 font-medium whitespace-nowrap">@row.MachineModel</td>
+                                    <td class="px-3 py-2 text-slate-100 font-medium">@row.StepTitle</td>
+                                    <td class="px-3 py-2 text-slate-100">
+                                        <div class="flex flex-wrap gap-2">
+                                            @foreach (var u in row.UserStats)
+                                            {
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-slate-600 bg-slate-900/70 text-[11px] whitespace-nowrap">
+                                                    <strong class="text-blue-200">@u.UserDisplayName</strong>
+                                                    <span class="text-slate-300">· @ReportTimeByUserModel.FormatDuration(u.AverageSeconds)</span>
+                                                    <span class="text-slate-500">(@u.Runs)</span>
+                                                </span>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <div class="time-report-panel rounded-2xl p-6 mb-6">
+            @* Filters heading removed to save space *@
+            <form method="get" class="flex flex-wrap gap-4 items-end">
+                <div class="min-w-[200px] relative">
+                    <label for="UserIdFilter" class="block text-sm font-medium text-slate-200 mb-1">User</label>
+                    <div class="searchable-select relative">
+                        <input type="hidden" name="UserIdFilter" id="UserIdFilter" value="@(Model.UserSelectList?.SelectedValue?.ToString() ?? "")" />
+                        <button type="button" class="select-trigger w-full px-4 py-2.5 rounded-xl border border-slate-600 bg-slate-700 text-left text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 flex items-center justify-between gap-2" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="select-trigger-text truncate">@(Model.UserSelectList?.FirstOrDefault(x => x.Selected)?.Text ?? "— All users —")</span>
+                            <span class="text-slate-300 text-xs shrink-0">▼</span>
+                        </button>
+                        <div class="select-dropdown absolute left-0 right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-lg z-50 overflow-hidden hidden min-w-[200px] max-h-[280px] flex flex-col">
+                            <input type="text" class="select-filter px-3 py-2 bg-slate-700 border-b border-slate-600 focus:outline-none focus:ring-0 text-sm text-white placeholder-slate-300" placeholder="Filter users..." autocomplete="off" />
+                            <ul class="select-options overflow-auto py-1 max-h-[220px]" role="listbox">
+                                @foreach (var item in Model.UserSelectList ?? Enumerable.Empty<SelectListItem>())
+                                {
+                                    <li class="select-option px-4 py-2 cursor-pointer hover:bg-slate-700 text-slate-100 @(item.Selected ? "bg-blue-900/40 text-blue-100" : "")" role="option" data-value="@item.Value">@item.Text</li>
+                                }
+                            </ul>
+                        </div>
+                     </div>
+                 </div>
+                <div class="min-w-[220px] relative">
+                    <label for="OrderIdFilter" class="block text-sm font-medium text-slate-200 mb-1">Order</label>
+                    <div class="searchable-select relative">
+                        <input type="hidden" name="OrderIdFilter" id="OrderIdFilter" value="@(Model.OrderSelectList?.SelectedValue?.ToString() ?? "")" />
+                        <button type="button" class="select-trigger w-full px-4 py-2.5 rounded-xl border border-slate-600 bg-slate-700 text-left text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 flex items-center justify-between gap-2" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="select-trigger-text truncate">@(Model.OrderSelectList?.FirstOrDefault(x => x.Selected)?.Text ?? "— All orders —")</span>
+                            <span class="text-slate-300 text-xs shrink-0">▼</span>
+                        </button>
+                        <div class="select-dropdown absolute left-0 right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-lg z-50 overflow-hidden hidden min-w-[220px] max-h-[280px] flex flex-column">
+                            <input type="text" class="select-filter px-3 py-2 bg-slate-700 border-b border-slate-600 focus:outline-none focus:ring-0 text-sm text-white placeholder-slate-300" placeholder="Filter orders..." autocomplete="off" />
+                            <ul class="select-options overflow-auto py-1 max-h-[220px]" role="listbox">
+                                @foreach (var item in Model.OrderSelectList ?? Enumerable.Empty<SelectListItem>())
+                                {
+                                    <li class="select-option px-4 py-2 cursor-pointer hover:bg-slate-700 text-slate-100 @(item.Selected ? "bg-blue-900/40 text-blue-100" : "")" role="option" data-value="@item.Value">@item.Text</li>
+                                }
+                            </ul>
+                        </div>
+                     </div>
+                 </div>
+                <div class="min-w-[160px]">
+                    <label for="StatusFilter" class="block text-sm font-medium text-slate-200 mb-1">Status</label>
+                    <select asp-for="StatusFilter" class="w-full px-4 py-2.5 rounded-xl border border-slate-600 bg-slate-700 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30">
+                        <option value="">All</option>
+                        <option value="InProgress">In progress</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="FromDate" class="block text-sm font-medium text-slate-200 mb-1">From date</label>
+                    <input asp-for="FromDate" type="date" class="px-4 py-2.5 rounded-xl border border-slate-600 bg-slate-700 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30" />
+                </div>
+                <div>
+                    <label for="ToDate" class="block text-sm font-medium text-slate-200 mb-1">To date</label>
+                    <input asp-for="ToDate" type="date" class="px-4 py-2.5 rounded-xl border border-slate-600 bg-slate-700 text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30" />
+                </div>
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md">Apply</button>
+            </form>
+            <partial name="_Pagination" model="Model.Pagination" />
+
+            @if (User.IsInRole("Admin") && Model.StepOptions.Any())
+            {
+                <div class="mt-4 flex justify-end">
+                    <button type="button" id="btnAddRun" class="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600">
+                        + Add step run (admin)
+                    </button>
+                </div>
+            }
+
+        <div class="overflow-x-auto table-scroll mt-4">
+            @if (Model.Rows.Count == 0)
+            {
+                <p class="p-6 text-slate-500">No time recorded for the selected filters. Time is recorded from order execution (when a user starts and stops a step) and from internal tasks (Tasks → Start/Pause/Finish).</p>
+            }
+            else
+            {
+                <table class="min-w-full divide-y divide-slate-700 w-full text-xs table-report">
+                    <thead class="bg-slate-900/60">
+                        <tr>
+                            <th class="px-3 py-2 w-2/12 text-center font-semibold text-slate-300 uppercase tracking-wider">User</th>
+                            <th class="px-3 py-2 w-1/12 text-center font-semibold text-slate-300 uppercase tracking-wider">Machine</th>
+                            <th class="px-3 py-2 w-1/12 text-center font-semibold text-slate-300 uppercase tracking-wider">Variant</th>
+                            <th class="px-3 py-2 w-3/12 text-center font-semibold text-slate-300 uppercase tracking-wider">Order</th>
+                            <th class="px-3 py-2 w-2/12 text-center font-semibold text-slate-300 uppercase tracking-wider">Task</th>
+                            <th class="px-3 py-2 w-2/12 text-center font-semibold text-slate-300 uppercase tracking-wider whitespace-nowrap">Started</th>
+                            <th class="px-3 py-2 w-2/12 text-center font-semibold text-slate-300 uppercase tracking-wider whitespace-nowrap">Finished</th>
+                            <th class="px-3 py-2 w-1/12 text-center font-semibold text-slate-300 uppercase tracking-wider whitespace-nowrap">Duration</th>
+                            <th class="px-3 py-2 w-1/12 text-center font-semibold text-slate-300 uppercase tracking-wider whitespace-nowrap">Amount</th>
+                             @if (User.IsInRole("Admin"))
+                             {
+                                 <th class="px-3 py-2 w-1/12 text-center font-semibold text-slate-300 uppercase tracking-wider whitespace-nowrap">Actions</th>
+                             }
+                         </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700">
+                        @foreach (var row in Model.Rows)
+                        {
+                            <tr class="align-top">
+                                <td class="px-3 py-2 w-2/12 text-center font-medium text-white break-words">@row.UserDisplayName</td>
+                                <td class="px-3 py-2 w-1/12 text-center text-slate-200 break-words">@row.MachineModel</td>
+                                <td class="px-3 py-2 w-1/12 text-center text-slate-200 break-words">@row.MachineVariant</td>
+                                <td class="px-3 py-2 w-3/12 text-center text-slate-200 break-words">@row.OrderRef @(string.IsNullOrEmpty(row.SerialNumber) ? "" : $" / {row.SerialNumber}")</td>
+                                <td class="px-3 py-2 w-2/12 text-center text-white break-words">
+                                    @row.StepTitle
+                                    @if (row.IsInternalTask)
+                                    {
+                                        <span class="text-slate-400 text-[10px]">(internal task)</span>
+                                    }
+                                </td>
+                                <td class="px-3 py-2 w-2/12 text-center text-slate-200 whitespace-nowrap">@row.StartedAt.ToLocalTime().ToString("g")</td>
+                                <td class="px-3 py-2 w-2/12 text-center text-slate-200 whitespace-nowrap">@(row.FinishedAt?.ToLocalTime().ToString("g") ?? (row.IsInProgress ? "In progress" : "—"))</td>
+                                <td class="px-3 py-2 w-1/12 text-center font-medium text-white whitespace-nowrap">@ReportTimeByUserModel.FormatDuration(row.DurationSeconds)@(row.IsInProgress ? " (so far)" : "")</td>
+                                <td class="px-3 py-2 w-1/12 text-center font-medium text-emerald-200 whitespace-nowrap">€@row.CostEuros</td>
+                                @if (User.IsInRole("Admin"))
+                                {
+                                    <td class="px-3 py-2 w-1/12 text-center whitespace-nowrap">
+                                        @if (!row.IsInternalTask && row.StepRunId > 0)
+                                        {
+                                            <button type="button"
+                                                    class="edit-run-btn inline-flex px-3 py-1.5 rounded-lg border border-blue-400 text-blue-200 text-xs font-medium hover:bg-blue-900/40 mr-2"
+                                                    data-id="@row.StepRunId"
+                                                    data-start="@row.StartedAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")"
+                                                    data-finish="@(row.FinishedAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm") ?? "")">
+                                                Edit
+                                            </button>
+                                            <form method="post" asp-page-handler="DeleteRun" asp-route-id="@row.StepRunId" class="inline" onsubmit="return confirm('Delete this step run?');">
+                                                <button type="submit" class="inline-flex px-3 py-1.5 rounded-lg border border-red-400 text-red-200 text-xs font-medium hover:bg-red-900/40">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-slate-500 text-xs">—</span>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                }
+            </div>
+            
+            @if (Model.Rows.Count > 0)
+            {
+                <div class="px-6 py-4 bg-slate-900/80 border-t border-cyan-400/40">
+                    <h3 class="text-sm font-semibold text-white mb-2">Time summary (filtered)</h3>
+                    <p class="text-slate-100">Total time spent: @ReportTimeByUserModel.FormatDuration(Model.TotalDurationSeconds)</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (User.IsInRole("Admin"))
+{
+    <!-- Edit run modal -->
+    <div id="editRunModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-hidden="true">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="fixed inset-0 bg-slate-900/60" id="editRunBackdrop"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl border border-slate-200 p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Edit step run</h3>
+                <form method="post" asp-page-handler="EditRun" id="editRunForm">
+                    <input type="hidden" name="id" id="editRunId" />
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Started (local)</label>
+                            <input type="datetime-local" name="startedLocal" id="editRunStarted" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Finished (local)</label>
+                            <input type="datetime-local" name="finishedLocal" id="editRunFinished" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                            <p class="mt-1 text-xs text-slate-500">Leave empty for an in-progress run.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 justify-end mt-6">
+                        <button type="button" id="editRunCancel" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Cancel</button>
+                        <button type="submit" class="px-4 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add run modal -->
+    <div id="addRunModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-hidden="true">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="fixed inset-0 bg-slate-900/60" id="addRunBackdrop"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl border border-slate-200 p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Add step run</h3>
+                <form method="post" asp-page-handler="AddRun" id="addRunForm">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">User</label>
+                            <select name="userId" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required>
+                                @foreach (var kv in Model.UserDisplayNames)
+                                {
+                                    <option value="@kv.Key">@kv.Value</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Step</label>
+                            <select name="stepExecId" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required>
+                                @foreach (var opt in Model.StepOptions)
+                                {
+                                    <option value="@opt.StepExecId">@opt.Display</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Started (local)</label>
+                            <input type="datetime-local" name="startedLocal" id="addRunStarted" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Finished (local)</label>
+                            <input type="datetime-local" name="finishedLocal" id="addRunFinished" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                            <p class="mt-1 text-xs text-slate-500">Leave empty for an in-progress run.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 justify-end mt-6">
+                        <button type="button" id="addRunCancel" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Cancel</button>
+                        <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700">Add</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+(function () {
+    function initSearchableSelect(container) {
+        if (!container) return;
+        var trigger = container.querySelector('.select-trigger');
+        var dropdown = container.querySelector('.select-dropdown');
+        var filterInput = container.querySelector('.select-filter');
+        var optionsList = container.querySelector('.select-options');
+        var options = container.querySelectorAll('.select-option');
+        var hiddenInput = container.querySelector('input[type="hidden"]');
+        var triggerText = container.querySelector('.select-trigger-text');
+
+        function open() {
+            document.querySelectorAll('.searchable-select .select-dropdown').forEach(function (d) {
+                if (d !== dropdown) d.classList.add('hidden');
+            });
+            dropdown.classList.remove('hidden');
+            trigger.setAttribute('aria-expanded', 'true');
+            filterInput.value = '';
+            filterInput.focus();
+            options.forEach(function (opt) { opt.style.display = ''; });
+            // Ensure trigger text is populated immediately when opened so it's visible
+            try {
+                if (triggerText) {
+                    var val = hiddenInput ? hiddenInput.value : null;
+                    var found = null;
+                    if (val) {
+                        Array.prototype.forEach.call(options, function(o){ if (!found && o.getAttribute('data-value') === val) found = o; });
+                    }
+                    if (found) {
+                        triggerText.textContent = found.textContent.trim();
+                    } else if (hiddenInput && !hiddenInput.value) {
+                        triggerText.textContent = (hiddenInput.name === 'UserIdFilter') ? '— All users —' : '— All orders —';
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+        function close() {
+            dropdown.classList.add('hidden');
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+        function choose(value, text) {
+            if (hiddenInput) hiddenInput.value = value || '';
+            if (triggerText) triggerText.textContent = text || (hiddenInput.name === 'UserIdFilter' ? '— All users —' : '— All orders —');
+            close();
+        }
+
+        trigger.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (dropdown.classList.contains('hidden')) open(); else close();
+        });
+        filterInput.addEventListener('input', function () {
+            var q = (this.value || '').trim().toLowerCase();
+            options.forEach(function (opt) {
+                var show = !q || (opt.textContent || '').toLowerCase().indexOf(q) >= 0;
+                opt.style.display = show ? '' : 'none';
+            });
+        });
+        filterInput.addEventListener('click', function (e) { e.stopPropagation(); });
+        options.forEach(function (opt) {
+            opt.addEventListener('click', function (e) {
+                e.stopPropagation();
+                choose(this.getAttribute('data-value'), this.textContent);
+            });
+        });
+        document.addEventListener('click', function (e) {
+            if (!container.contains(e.target)) close();
+        });
+    }
+    document.querySelectorAll('.searchable-select').forEach(initSearchableSelect);
+
+    // Admin: edit / add run modals
+    var editButtons = document.querySelectorAll('.edit-run-btn');
+    var editModal = document.getElementById('editRunModal');
+    if (editModal && editButtons.length) {
+        var editId = document.getElementById('editRunId');
+        var editStarted = document.getElementById('editRunStarted');
+        var editFinished = document.getElementById('editRunFinished');
+        editButtons.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                editId.value = this.getAttribute('data-id');
+                editStarted.value = this.getAttribute('data-start') || '';
+                editFinished.value = this.getAttribute('data-finish') || '';
+                editModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            });
+        });
+        document.getElementById('editRunCancel').addEventListener('click', function() {
+            editModal.classList.add('hidden');
+            document.body.style.overflow = '';
+        });
+        document.getElementById('editRunBackdrop').addEventListener('click', function() {
+            editModal.classList.add('hidden');
+            document.body.style.overflow = '';
+        });
+    }
+
+    var addBtn = document.getElementById('btnAddRun');
+    var addModal = document.getElementById('addRunModal');
+    if (addBtn && addModal) {
+        addBtn.addEventListener('click', function() {
+            var now = new Date();
+            var y = now.getFullYear();
+            var m = String(now.getMonth() + 1).padStart(2, '0');
+            var d = String(now.getDate()).padStart(2, '0');
+            var h = String(now.getHours()).padStart(2, '0');
+            var min = String(now.getMinutes()).padStart(2, '0');
+            var val = y + '-' + m + '-' + d + 'T' + h + ':' + min;
+            var startedInput = document.getElementById('addRunStarted');
+            if (startedInput) startedInput.value = val;
+            addModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        });
+        document.getElementById('addRunCancel').addEventListener('click', function() {
+            addModal.classList.add('hidden');
+            document.body.style.overflow = '';
+        });
+        document.getElementById('addRunBackdrop').addEventListener('click', function() {
+            addModal.classList.add('hidden');
+            document.body.style.overflow = '';
+        });
+    }
+})();
+</script>
+<script>
+document.getElementById('exportPdfBtn')?.addEventListener('click', function() {
+    // Open a new window with a printable view of the report and trigger print-to-PDF in browser
+    var url = window.location.pathname + window.location.search;
+    var w = window.open(url + (url.indexOf('?') === -1 ? '?' : '&') + 'print=1', '_blank');
+    if (!w) alert('Please allow popups to export PDF');
+});
+</script>
+}

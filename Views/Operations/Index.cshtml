@@ -1,0 +1,18 @@
+@{
+    ViewData["Title"] = "Operations";
+}
+<div class="animate-fade-in">
+    <h1 class="text-2xl font-bold text-slate-800 mb-6">Plant operations</h1>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 hover:shadow-lg transition-shadow duration-200 flex flex-col">
+            <h2 class="text-lg font-semibold text-slate-800 mb-2">Putaway</h2>
+            <p class="text-slate-600 text-sm flex-1">Scan TAG and LOCATION (QR) to register entry at a shelf or workstation. Move items from Reception to warehouse or production station.</p>
+            <a class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 mt-4 w-fit" asp-action="Putaway">Open Putaway</a>
+        </div>
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 hover:shadow-lg transition-shadow duration-200 flex flex-col">
+            <h2 class="text-lg font-semibold text-slate-800 mb-2">Pick</h2>
+            <p class="text-slate-600 text-sm flex-1">Scan LOCATION and TAG, select destination (Production, Workshop, Station, or Order). Move items from warehouse to production.</p>
+            <a class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 mt-4 w-fit" asp-action="Pick">Open Pick</a>
+        </div>
+    </div>
+</div>

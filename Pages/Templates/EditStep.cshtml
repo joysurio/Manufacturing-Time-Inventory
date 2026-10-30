@@ -1,0 +1,630 @@
+@page
+@model ManufacturingTimeTracking.Pages.Templates.EditStepModel
+@{
+    ViewData["Title"] = "Edit Step";
+}
+
+<div class="animate-fade-in w-full">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Edit Step</h1>
+    <div class="mb-6">
+        <a asp-page="./Edit" asp-route-id="@Model.ProcessTemplate.Id" class="inline-flex items-center px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">Back to Template</a>
+    </div>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-start justify-between gap-4" role="alert">
+            <div>
+                <strong>Validation Errors:</strong>
+                <ul class="list-disc list-inside mt-1 mb-0">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <li>@error.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="text-amber-600 hover:text-amber-800 text-xl leading-none shrink-0" aria-label="Dismiss">×</button>
+        </div>
+    }
+
+    <form method="post" id="stepForm">
+        <input type="hidden" asp-for="ReturnUrl" />
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-slate-800 mb-4">Step Details</h2>
+            <!-- <div asp-validation-summary="All" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm mb-4"></div> -->
+            <input type="hidden" asp-for="StepEdit.Id" />
+
+            <div class="mb-5">
+                <label asp-for="StepEdit.Title" class="block text-sm font-medium text-slate-700 mb-1.5">Title</label>
+                <input asp-for="StepEdit.Title" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" required />
+                <span asp-validation-for="StepEdit.Title" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+
+            <div class="mb-5">
+                <label asp-for="StepEdit.Instructions" class="block text-sm font-medium text-slate-700 mb-1.5">Instructions</label>
+                <div class="flex flex-wrap gap-2 mb-2" role="toolbar" aria-label="Text formatting toolbar">
+                    <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors" onclick="insertLink()" title="Insert Link">🔗 Insert Link</button>
+                    <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors" onclick="formatList()" title="Create List">📋 List</button>
+                    <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors" onclick="insertLineBreak()" title="Line Break">↵ Line Break</button>
+                    <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors" onclick="moveLineUp()" title="Move Line Up">↑ Move Up</button>
+                    <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors" onclick="moveLineDown()" title="Move Line Down">↓ Move Down</button>
+                </div>
+                <textarea asp-for="StepEdit.Instructions" id="instructionsEditor" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 min-h-[200px]" rows="10" style="white-space: pre-wrap;"></textarea>
+                <p class="text-slate-500 text-sm mt-1.5">
+                    <strong>Tips:</strong> Press Enter twice for a new paragraph. Use the toolbar to insert links, create lists, or add line breaks. Links: [Link Text](URL) or paste the URL.
+                </p>
+                <span asp-validation-for="StepEdit.Instructions" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @{
+                    var allowSkipName = Html.NameFor(m => m.StepEdit.AllowSkip);
+                }
+                <input type="hidden" name="@allowSkipName" value="false" />
+                <input type="checkbox" name="@allowSkipName" value="true" id="@Html.IdFor(m => m.StepEdit.AllowSkip)"
+                       class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" @(Model.StepEdit.AllowSkip ? "checked" : "") />
+                <label class="text-sm font-medium text-slate-700" for="@Html.IdFor(m => m.StepEdit.AllowSkip)">Allow Skip</label>
+            </div>
+
+            <div class="flex items-center gap-2 mt-3">
+                @{
+                    var hiddenName = Html.NameFor(m => m.StepEdit.Hidden);
+                }
+                <input type="hidden" name="@hiddenName" value="false" />
+                <input type="checkbox" name="@hiddenName" value="true" id="@Html.IdFor(m => m.StepEdit.Hidden)"
+                       class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" @(Model.StepEdit.Hidden ? "checked" : "") />
+                <label class="text-sm font-medium text-slate-700" for="@Html.IdFor(m => m.StepEdit.Hidden)">Hidden</label>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-slate-800 mb-4">Tools</h2>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-slate-700 mb-1.5">Select Tools</label>
+                <select asp-for="StepEdit.SelectedToolIds" asp-items="Model.AvailableTools" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 min-h-[120px]" multiple size="5" data-val="false"></select>
+                <p class="text-slate-500 text-sm mt-1">Hold Ctrl (Cmd on Mac) to select multiple tools.</p>
+            </div>
+            @if (Model.StepTools.Any())
+            {
+                <div class="mt-3">
+                    <span class="text-sm font-medium text-slate-700">Current Tools:</span>
+                    <ul class="mt-1 list-disc list-inside text-slate-600">
+                        @foreach (var tool in Model.StepTools)
+                        {
+                            <li>@tool.Tool.Name</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-slate-800 mb-4">Screws / Materials</h2>
+            <datalist id="materialsDatalist">
+                @{
+                    var materialsSearch = (IEnumerable<dynamic>?)ViewData["MaterialsSearchOptions"];
+                }
+                @if (materialsSearch != null)
+                {
+                    foreach (var m in materialsSearch)
+                    {
+                        var id = (string)m.id;
+                        var name = (string)m.name;
+                        var reference = (string)m.reference;
+                        var label = (string)m.label;
+                        if (!string.IsNullOrWhiteSpace(name))
+                        {
+                            <option value="@name" data-id="@id" data-name="@name" data-ref="@reference"></option>
+                        }
+                        if (!string.IsNullOrWhiteSpace(reference))
+                        {
+                            <option value="@reference" data-id="@id" data-name="@name" data-ref="@reference"></option>
+                        }
+                        if (!string.IsNullOrWhiteSpace(label))
+                        {
+                            <option value="@label" data-id="@id" data-name="@name" data-ref="@reference"></option>
+                        }
+                    }
+                }
+            </datalist>
+            <div id="materialsContainer" class="space-y-3">
+                @if (Model.StepMaterials.Any())
+                {
+                    @for (int i = 0; i < Model.StepMaterials.Count; i++)
+                    {
+                        var matName = Model.StepMaterials[i].Material?.Name ?? "";
+                        var matRef = Model.StepMaterials[i].Material?.Reference;
+                        var matDisplay = string.IsNullOrWhiteSpace(matRef) ? matName : $"{matName} (Ref: {matRef})";
+                        <div class="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-50/50 border border-slate-100 material-row">
+                            <div class="min-w-[180px] flex-1">
+                                <input type="hidden" name="StepEdit.SelectedMaterialIds[@i]" value="@Model.StepMaterials[i].MaterialId" class="material-id" />
+                                <input type="text"
+                                       class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 material-input"
+                                       list="materialsDatalist"
+                                       placeholder="Type material name or reference…"
+                                       value="@matDisplay"
+                                       data-index="@i" />
+                            </div>
+                            <div class="w-24">
+                                <input name="StepEdit.MaterialQuantities[@i]"
+                                       type="text"
+                                       inputmode="decimal"
+                                       autocomplete="off"
+                                       class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                       placeholder="Qty"
+                                       value="@(Model.StepMaterials[i].Qty.HasValue ? Model.StepMaterials[i].Qty.Value.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) : "")" />
+                            </div>
+                            <div class="w-12 h-12 flex items-center justify-center shrink-0">
+                                @if (!string.IsNullOrEmpty(Model.StepMaterials[i].Material?.ImageUrl))
+                                {
+                                    <img src="~/uploads/@Model.StepMaterials[i].Material.ImageUrl" alt="@Model.StepMaterials[i].Material.Name" class="rounded-lg object-cover h-10 w-10" id="materialImage@i" />
+                                }
+                                else
+                                {
+                                    <span class="text-slate-400 text-xs" id="materialImage@i">No image</span>
+                                }
+                            </div>
+                            <button type="button" class="px-3 py-1.5 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50 remove-material">Remove</button>
+                        </div>
+                    }
+                }
+            </div>
+            <button type="button" id="addMaterialBtn" class="mt-3 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 shadow-md transition-all duration-200">Add Material</button>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-slate-800 mb-4">Media (Images, PDFs, Videos)</h2>
+            <div id="stepMediaGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+            @if (Model.StepMedia.Any())
+            {
+                    @foreach (var stepMedia in Model.StepMedia)
+                    {
+                        <div class="rounded-xl border border-slate-100 overflow-hidden bg-slate-50/30 media-item" data-media-id="@stepMedia.Id">
+                            @if (stepMedia.Media.Type == "Image")
+                            {
+                                <img src="~/uploads/@stepMedia.Media.UrlOrPath" class="w-full h-36 object-cover cursor-pointer hover:opacity-90 transition-opacity" onclick="openImageModal('@Url.Content($"~/uploads/{stepMedia.Media.UrlOrPath}")')" alt="@stepMedia.Caption" />
+                            }
+                            else if (stepMedia.Media.Type == "PDF")
+                            {
+                                <div class="h-36 flex flex-col items-center justify-center text-slate-500">
+                                    <span class="text-4xl">📄</span>
+                                    <span class="text-sm">PDF Document</span>
+                                </div>
+                            }
+                            else if (stepMedia.Media.Type == "Video")
+                            {
+                                <div class="h-36 flex flex-col items-center justify-center text-slate-500">
+                                    <span class="text-4xl">▶️</span>
+                                    <span class="text-sm">Video</span>
+                                </div>
+                            }
+                            <div class="p-3">
+                                @if (!string.IsNullOrEmpty(stepMedia.Caption))
+                                {
+                                    <p class="text-slate-600 text-sm mb-2">@stepMedia.Caption</p>
+                                }
+                                <div class="flex gap-2">
+                                    @if (stepMedia.Media.Type == "PDF")
+                                    {
+                                        <a href="~/uploads/@stepMedia.Media.UrlOrPath" target="_blank" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">View</a>
+                                    }
+                                    <button type="button" class="px-3 py-1.5 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50 delete-media-btn" data-media-id="@stepMedia.Id" onclick="deleteMedia(@stepMedia.Id)">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+            }
+            </div>
+
+            <div id="uploadNewMediaCard" class="rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                <h3 class="text-base font-medium text-slate-800 mb-3">Upload New Media</h3>
+                <div>
+                    <label for="mediaFiles" class="block text-sm font-medium text-slate-700 mb-1.5">Files (Image, PDF, or Video)</label>
+                    <input type="file" id="mediaFiles" name="MediaFiles" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700" accept="image/jpeg,image/jpg,image/png,image/gif,.pdf,video/mp4,video/avi,video/mov" multiple />
+                    <p class="text-slate-500 text-sm mt-1">Supported: Images (JPEG, JPG, PNG, GIF), PDFs, Videos (MP4, AVI, MOV). You can select multiple files.</p>
+                </div>
+                <div id="mediaCaptionsContainer" class="mt-3"></div>
+            </div>
+        </div>
+
+        <div class="flex gap-3">
+        <div class="m-auto">
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transition-all duration-200">Save Changes</button>
+            <a asp-page="./Edit" asp-route-id="@Model.ProcessTemplate.Id" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">Cancel</a>
+        </div>
+        </div>
+    </form>
+</div>
+
+<!-- Image Modal (Tailwind) -->
+<div id="imageModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeImageModal()"></div>
+    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-scale-in">
+            <div class="flex items-center justify-between p-4 border-b border-slate-100">
+                <h3 class="text-lg font-semibold text-slate-800">Image Preview</h3>
+                <button type="button" onclick="closeImageModal()" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">×</button>
+            </div>
+            <div class="p-4 text-center bg-slate-50">
+                <img id="modalImage" src="" class="max-w-full max-h-[70vh] object-contain mx-auto rounded-lg" alt="Preview" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        function closeImageModal() {
+            document.getElementById('imageModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        function openImageModal(imageSrc) {
+            document.getElementById('modalImage').src = imageSrc;
+            document.getElementById('imageModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        var materialImages = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["MaterialImages"] ?? new Dictionary<string, string>()));
+
+        function updateMaterialImage(selectElement, index) {
+            var materialId = selectElement;
+            var imageContainer = document.getElementById('materialImage' + index);
+            if (imageContainer && materialId && materialImages[materialId]) {
+                imageContainer.outerHTML = '<img id="materialImage' + index + '" src="/uploads/' + materialImages[materialId] + '" class="rounded-lg object-cover h-10 w-10" alt="" />';
+            } else if (imageContainer) {
+                imageContainer.outerHTML = '<span id="materialImage' + index + '" class="text-slate-400 text-xs">No image</span>';
+            }
+        }
+
+        function resolveMaterialIdFromInput(inputEl) {
+            if (!inputEl) return '';
+            var listId = inputEl.getAttribute('list');
+            var dl = listId ? document.getElementById(listId) : null;
+            if (!dl) return '';
+            var val = (inputEl.value || '').trim();
+            if (!val) return '';
+
+            // 1) Exact match on option value (fast path)
+            var opt = dl.querySelector('option[value="' + CSS.escape(val) + '"]');
+            if (opt) return opt.getAttribute('data-id') || '';
+
+            // 2) If user typed only the reference (or only the name), match by data-ref/data-name.
+            var q = val.toLowerCase();
+            var options = Array.prototype.slice.call(dl.querySelectorAll('option'));
+            var byRef = options.find(function(o) {
+                var r = (o.getAttribute('data-ref') || '').trim().toLowerCase();
+                return r && r === q;
+            });
+            if (byRef) return byRef.getAttribute('data-id') || '';
+
+            var byName = options.find(function(o) {
+                var n = (o.getAttribute('data-name') || '').trim().toLowerCase();
+                return n && n === q;
+            });
+            if (byName) return byName.getAttribute('data-id') || '';
+
+            // 3) If user typed a combined string like "Name Ref" or partial, attempt a contains match.
+            // Prefer reference match first (usually more unique).
+            var containsRef = options.find(function(o) {
+                var r = (o.getAttribute('data-ref') || '').trim().toLowerCase();
+                return r && q.indexOf(r) !== -1;
+            });
+            if (containsRef) return containsRef.getAttribute('data-id') || '';
+
+            var containsName = options.find(function(o) {
+                var n = (o.getAttribute('data-name') || '').trim().toLowerCase();
+                return n && q.indexOf(n) !== -1;
+            });
+            if (containsName) return containsName.getAttribute('data-id') || '';
+
+            return '';
+        }
+
+        function normalizeQtyValue(raw) {
+            if (raw == null) return '';
+            var s = String(raw).trim();
+            if (!s) return '';
+            // Replace comma decimal separators with dot; drop spaces.
+            s = s.replace(/\s+/g, '').replace(',', '.');
+            // Keep only digits, one leading '-', and one dot.
+            s = s.replace(/(?!^-)[^\d.]/g, ''); // remove non digit/dot except leading '-'
+            // Collapse multiple dots to one.
+            var firstDot = s.indexOf('.');
+            if (firstDot !== -1) {
+                s = s.substring(0, firstDot + 1) + s.substring(firstDot + 1).replace(/\./g, '');
+            }
+            // Trim trailing zeros and trailing dot.
+            if (s.indexOf('.') !== -1) {
+                s = s.replace(/0+$/g, '').replace(/\.$/g, '');
+            }
+            return s;
+        }
+
+        function wireQtyInputs(root) {
+            (root || document).querySelectorAll('input[name^="StepEdit.MaterialQuantities["]').forEach(function(inp) {
+                if (inp.dataset.qtyWired === '1') return;
+                inp.dataset.qtyWired = '1';
+                inp.addEventListener('blur', function() {
+                    inp.value = normalizeQtyValue(inp.value);
+                });
+            });
+        }
+
+        function wireMaterialInput(inputEl) {
+            if (!inputEl) return;
+            var idx = inputEl.getAttribute('data-index');
+            var row = inputEl.closest('.material-row');
+            var hidden = row ? row.querySelector('input.material-id') : null;
+            function sync() {
+                var id = resolveMaterialIdFromInput(inputEl);
+                if (hidden) hidden.value = id;
+                if (idx != null) updateMaterialImage(id, idx);
+            }
+            inputEl.addEventListener('change', sync);
+            inputEl.addEventListener('blur', sync);
+            // Ensure correct image on first load
+            sync();
+        }
+
+        document.querySelectorAll('.material-input').forEach(wireMaterialInput);
+        wireQtyInputs(document);
+
+        document.getElementById('addMaterialBtn')?.addEventListener('click', function() {
+            var container = document.getElementById('materialsContainer');
+            var index = container.querySelectorAll('.material-row').length;
+            var newRow = document.createElement('div');
+            newRow.className = 'flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-50/50 border border-slate-100 material-row';
+            newRow.innerHTML = `
+                <div class="min-w-[180px] flex-1">
+                    <input type="hidden" name="StepEdit.SelectedMaterialIds[${index}]" value="" class="material-id" />
+                    <input type="text"
+                           class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 material-input"
+                           list="materialsDatalist"
+                           placeholder="Type material name or reference…"
+                           data-index="${index}" />
+                </div>
+                <div class="w-24">
+                    <input name="StepEdit.MaterialQuantities[${index}]"
+                           type="text"
+                           inputmode="decimal"
+                           autocomplete="off"
+                           class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                           placeholder="Qty" />
+                </div>
+                <div class="w-12 h-12 flex items-center justify-center shrink-0">
+                    <span class="text-slate-400 text-xs" id="materialImage${index}">No image</span>
+                </div>
+                <button type="button" class="px-3 py-1.5 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50 remove-material">Remove</button>
+            `;
+            container.appendChild(newRow);
+            wireMaterialInput(newRow.querySelector('.material-input'));
+            wireQtyInputs(newRow);
+        });
+
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-material')) {
+                e.target.closest('.material-row').remove();
+            }
+        });
+
+        var stepId = @Model.StepTemplate.Id;
+
+        var mediaFilesInput = document.getElementById('mediaFiles');
+        var mediaCaptionsContainer = document.getElementById('mediaCaptionsContainer');
+        var uploadProgressContainer = document.createElement('div');
+        uploadProgressContainer.id = 'uploadProgress';
+        uploadProgressContainer.className = 'mt-2 space-y-2';
+
+        if (mediaFilesInput && mediaCaptionsContainer) {
+            mediaCaptionsContainer.parentNode.insertBefore(uploadProgressContainer, mediaCaptionsContainer.nextSibling);
+
+            mediaFilesInput.addEventListener('change', function() {
+                var files = Array.from(this.files);
+                if (files.length === 0) return;
+                mediaCaptionsContainer.innerHTML = '';
+                uploadProgressContainer.innerHTML = '';
+
+                files.forEach(function(file, index) {
+                    var captionDiv = document.createElement('div');
+                    captionDiv.className = 'mb-2';
+                    captionDiv.innerHTML = `
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Caption for ${file.name.replace(/</g, '&lt;').replace(/>/g, '&gt;')} (Optional)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="caption_${index}" class="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Enter caption..." />
+                            <button type="button" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700" onclick="uploadMediaFile(${index}, '${file.name.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">Upload</button>
+                        </div>
+                    `;
+                    mediaCaptionsContainer.appendChild(captionDiv);
+                    if (!window.pendingFiles) window.pendingFiles = {};
+                    window.pendingFiles[index] = file;
+                });
+            });
+        }
+
+        window.uploadMediaFile = function(index, fileName) {
+            var file = window.pendingFiles && window.pendingFiles[index];
+            if (!file) {
+                alert('File not found. Please select files again.');
+                return;
+            }
+            var captionInput = document.getElementById('caption_' + index);
+            var caption = captionInput ? captionInput.value : '';
+            var formData = new FormData();
+            formData.append('file', file);
+            formData.append('stepId', stepId);
+            formData.append('caption', caption);
+
+            var progressDiv = document.createElement('div');
+            progressDiv.id = 'progress_' + index;
+            progressDiv.className = 'p-3 rounded-xl bg-slate-100 text-slate-700 text-sm';
+            progressDiv.innerHTML = `Uploading ${fileName.replace(/</g, '&lt;').replace(/>/g, '&gt;')}... <span class="inline-block w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin ml-1"></span>`;
+            uploadProgressContainer.appendChild(progressDiv);
+
+            var uploadBtn = captionInput?.parentNode?.querySelector('button');
+            if (uploadBtn) uploadBtn.disabled = true;
+
+            fetch('?handler=UploadMedia', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    progressDiv.className = 'p-3 rounded-xl bg-emerald-50 text-emerald-800 text-sm';
+                    progressDiv.innerHTML = `✓ ${fileName.replace(/</g, '&lt;').replace(/>/g, '&gt;')} uploaded successfully!`;
+                    addMediaToDisplay(data);
+                    setTimeout(function() {
+                        var captionDiv = document.getElementById('caption_' + index)?.closest('.mb-2');
+                        if (captionDiv) captionDiv.remove();
+                        progressDiv.remove();
+                        delete window.pendingFiles[index];
+                        if (!window.pendingFiles || Object.keys(window.pendingFiles).length === 0) {
+                            mediaFilesInput.value = '';
+                            uploadProgressContainer.innerHTML = '';
+                        }
+                    }, 2000);
+                } else {
+                    progressDiv.className = 'p-3 rounded-xl bg-red-50 text-red-700 text-sm';
+                    progressDiv.innerHTML = `✗ Error: ${data.message || 'Upload failed'}`;
+                    if (uploadBtn) uploadBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                progressDiv.className = 'p-3 rounded-xl bg-red-50 text-red-700 text-sm';
+                progressDiv.innerHTML = `✗ Error uploading ${fileName.replace(/</g, '&lt;').replace(/>/g, '&gt;')}. Please try again.`;
+                if (uploadBtn) uploadBtn.disabled = false;
+            });
+        };
+
+        function addMediaToDisplay(data) {
+            var mediaItem = document.createElement('div');
+            mediaItem.className = 'rounded-xl border border-slate-100 overflow-hidden bg-slate-50/30 media-item';
+            mediaItem.setAttribute('data-media-id', data.stepMediaId);
+            var mediaType = data.mediaType;
+            var imageUrl = '/uploads/' + data.url;
+            var mediaContent = '';
+            if (mediaType === 'Image') {
+                mediaContent = `<img src="${imageUrl}" class="w-full h-36 object-cover cursor-pointer hover:opacity-90 transition-opacity" onclick="openImageModal('${imageUrl}')" alt="${(data.caption || '').replace(/"/g, '&quot;')}" />`;
+            } else if (mediaType === 'PDF') {
+                mediaContent = `<div class="h-36 flex flex-col items-center justify-center text-slate-500"><span class="text-4xl">📄</span><span class="text-sm">PDF Document</span></div>`;
+            } else if (mediaType === 'Video') {
+                mediaContent = `<div class="h-36 flex flex-col items-center justify-center text-slate-500"><span class="text-4xl">▶️</span><span class="text-sm">Video</span></div>`;
+            }
+            var captionHtml = data.caption ? `<p class="text-slate-600 text-sm mb-2">${data.caption.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : '';
+            var viewBtn = mediaType === 'PDF' ? `<a href="${imageUrl}" target="_blank" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">View</a>` : '';
+            mediaItem.innerHTML = mediaContent + `<div class="p-3">${captionHtml}<div class="flex gap-2">${viewBtn}<button type="button" class="px-3 py-1.5 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50 delete-media-btn" data-media-id="${data.stepMediaId}" onclick="deleteMedia(${data.stepMediaId})">Delete</button></div></div>`;
+
+            var grid = document.getElementById('stepMediaGrid');
+            if (grid) grid.appendChild(mediaItem);
+        }
+
+        window.deleteMedia = function(mediaId) {
+            if (!confirm('Are you sure you want to delete this media?')) return;
+            var mediaItem = document.querySelector('[data-media-id="' + mediaId + '"]');
+            if (!mediaItem) return;
+            var deleteBtn = mediaItem.querySelector('.delete-media-btn');
+            if (deleteBtn) {
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = 'Deleting...';
+            }
+            var formData = new FormData();
+            formData.append('stepMediaId', mediaId);
+            fetch('?handler=DeleteMedia', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mediaItem.style.transition = 'opacity 0.3s';
+                    mediaItem.style.opacity = '0';
+                    setTimeout(function() { mediaItem.remove(); }, 300);
+                } else {
+                    alert('Error deleting media: ' + (data.message || 'Unknown error'));
+                    if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }
+                }
+            })
+            .catch(function() {
+                alert('Error deleting media. Please try again.');
+                if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = 'Delete'; }
+            });
+        };
+
+        var editor = document.getElementById('instructionsEditor');
+        if (editor) {
+            editor.style.whiteSpace = 'pre-wrap';
+            function insertTextAtCursor(text) {
+                var start = editor.selectionStart, end = editor.selectionEnd;
+                var newText = editor.value.substring(0, start) + text + editor.value.substring(end);
+                editor.value = newText;
+                editor.selectionStart = editor.selectionEnd = start + text.length;
+                editor.focus();
+            }
+            window.insertLink = function() {
+                var url = prompt('Enter URL:', 'https://');
+                if (url) {
+                    var linkText = prompt('Enter link text (or leave empty to use URL):', '');
+                    insertTextAtCursor(linkText ? '[' + linkText + '](' + url + ')' : url);
+                }
+            };
+            window.formatList = function() {
+                var selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+                if (selectedText) {
+                    var listItems = selectedText.split('\n').filter(function(l) { return l.trim(); }).map(function(l) { return '- ' + l.trim(); }).join('\n');
+                    insertTextAtCursor(listItems);
+                } else {
+                    insertTextAtCursor('- ');
+                }
+            };
+            window.insertLineBreak = function() { insertTextAtCursor('\n'); };
+            window.moveLineUp = function() {
+                var start = editor.selectionStart, text = editor.value;
+                var lineStart = text.lastIndexOf('\n', start - 1) + 1;
+                var lineEnd = text.indexOf('\n', start); if (lineEnd === -1) lineEnd = text.length;
+                var prevLineStart = text.lastIndexOf('\n', lineStart - 2) + 1;
+                if (prevLineStart < lineStart) {
+                    var currentLine = text.substring(lineStart, lineEnd);
+                    var prevLine = text.substring(prevLineStart, lineStart - 1);
+                    editor.value = text.substring(0, prevLineStart) + currentLine + '\n' + prevLine + text.substring(lineEnd);
+                    editor.selectionStart = prevLineStart;
+                    editor.selectionEnd = prevLineStart + currentLine.length;
+                    editor.focus();
+                }
+            };
+            window.moveLineDown = function() {
+                var start = editor.selectionStart, text = editor.value;
+                var lineStart = text.lastIndexOf('\n', start - 1) + 1;
+                var lineEnd = text.indexOf('\n', start); if (lineEnd === -1) lineEnd = text.length;
+                var nextLineStart = lineEnd + 1;
+                var nextLineEnd = text.indexOf('\n', nextLineStart); if (nextLineEnd === -1) nextLineEnd = text.length;
+                if (nextLineStart <= text.length) {
+                    var currentLine = text.substring(lineStart, lineEnd);
+                    var nextLine = text.substring(nextLineStart, nextLineEnd);
+                    editor.value = text.substring(0, lineStart) + nextLine + '\n' + currentLine + text.substring(nextLineEnd);
+                    editor.selectionStart = lineStart + nextLine.length + 1;
+                    editor.selectionEnd = editor.selectionStart + currentLine.length;
+                    editor.focus();
+                }
+            };
+            editor.addEventListener('paste', function(e) {
+                setTimeout(function() {
+                    var text = editor.value;
+                    var urlRegex = /(https?:\/\/[^\s]+)/g;
+                    editor.value = text.replace(urlRegex, function(url) {
+                        if (!text.includes('[') || !text.includes('](')) return '[' + url + '](' + url + ')';
+                        return url;
+                    });
+                }, 10);
+            });
+        }
+    </script>
+}

@@ -1,0 +1,252 @@
+@page
+@model ManufacturingTimeTracking.Pages.Templates.EditModel
+@{
+    ViewData["Title"] = "Edit Template";
+}
+
+<div class="animate-fade-in">
+    <div class="mb-6">
+        <a asp-page="./Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">← Back to List</a>
+    </div>
+
+    <!-- Anti-forgery token for JS reorder POSTs -->
+    <form method="post" class="hidden">
+        @Html.AntiForgeryToken()
+    </form>
+
+    @if (Model.ProcessTemplate.Phases.Any())
+    {
+        @foreach (var phase in Model.ProcessTemplate.Phases.OrderBy(p => p.SortOrder))
+        {
+            <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden mb-6">
+                <div class="px-6 py-4 bg-slate-50/80 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2">
+                    <h2 class="text-lg font-semibold text-slate-800">@phase.Name</h2>
+                    <div class="flex items-center gap-2">
+                        <form method="post" asp-page-handler="MovePhase" class="inline-flex gap-1">
+                            <input type="hidden" name="phaseId" value="@phase.Id" />
+                            <button type="submit" name="direction" value="up" class="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all" @(phase.SortOrder == 1 ? "disabled" : "")>↑</button>
+                            <button type="submit" name="direction" value="down" class="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all" @(phase.SortOrder == Model.ProcessTemplate.Phases.Count ? "disabled" : "")>↓</button>
+                        </form>
+                        <form method="post" asp-page-handler="DeletePhase" class="inline" onsubmit="return confirm('Are you sure you want to delete this phase and all its steps?');">
+                            <input type="hidden" name="phaseId" value="@phase.Id" />
+                            <button type="submit" class="p-2 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50 transition-all">Delete</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="p-6">
+                    @if (phase.Steps.Any())
+                    {
+                        <div class="overflow-x-auto mb-6">
+                            <table class="min-w-full divide-y divide-slate-200 table-fixed w-full">
+                                <thead class="bg-slate-50/80">
+                                    <tr>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase w-[56px]">Move</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase w-1/12">Order</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase w-3/12">Title</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase w-3/12">Instructions</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase w-1/12">Allow Skip</th>
+                                        <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase w-4/12">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 js-step-sort" data-phase-id="@phase.Id">
+                                    @foreach (var step in phase.Steps.OrderBy(s => s.SortOrder))
+                                    {
+                                        <tr class="table-row-hover transition-colors js-step-row" draggable="true" data-step-id="@step.Id">
+                                            <td class="px-4 py-3 text-center">
+                                                <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-300 text-slate-500 cursor-grab select-none js-drag-handle" title="Drag to reorder">↕</span>
+                                            </td>
+                                            <td class="px-4 py-3 w-1/12 text-center text-slate-600 js-step-order">@step.SortOrder</td>
+                                            <td class="px-4 py-3 w-3/12 text-center font-medium text-slate-800">@step.Title</td>
+                                            <td class="px-4 py-3 w-3/12 text-center text-slate-600 text-sm">@(step.Instructions.Length > 50 ? step.Instructions.Substring(0, 50) + "..." : step.Instructions)</td>
+                                            <td class="px-4 py-3 w-1/12 text-center text-slate-600">@(step.AllowSkip ? "Yes" : "No")</td>
+                                            <td class="px-4 py-3 w-4/12 text-center text-right">
+                                                <button type="button" onclick="previewStep(@step.Id)" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 mr-2">Preview</button>
+                                                <a asp-page="./EditStep" asp-route-id="@step.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 text-sm font-medium hover:bg-blue-50 mr-2">Edit</a>
+                                                <form method="post" asp-page-handler="MoveStep" class="inline mr-2">
+                                                    <input type="hidden" name="stepId" value="@step.Id" />
+                                                    <button type="submit" name="direction" value="up" class="p-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50" @(step.SortOrder == 1 ? "disabled" : "")>↑</button>
+                                                    <button type="submit" name="direction" value="down" class="p-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50" @(step.SortOrder == phase.Steps.Count ? "disabled" : "")>↓</button>
+                                                </form>
+                                                <form method="post" asp-page-handler="DeleteStep" class="inline" onsubmit="return confirm('Are you sure you want to delete this step?');">
+                                                    <input type="hidden" name="stepId" value="@step.Id" />
+                                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50">Delete</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            <p class="text-xs text-slate-500 mt-2">Tip: drag and drop rows to reorder steps quickly. (Arrow buttons still work.)</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-slate-500 mb-4">No steps in this phase.</p>
+                    }
+                    <div class="pt-4 border-t border-slate-100">
+                        <h3 class="text-sm font-semibold text-slate-700 mb-3">Add Step to @phase.Name</h3>
+                        <form method="post" asp-page-handler="AddStep" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                            <div asp-validation-summary="All" class="text-red-600 text-sm md:col-span-12"></div>
+                            <input type="hidden" name="SelectedPhaseId" value="@phase.Id" />
+                            <input type="hidden" name="NewStep.PhaseTemplateId" value="@phase.Id" />
+                            <div class="md:col-span-3">
+                                <label asp-for="NewStep.Title" class="block text-sm font-medium text-slate-700 mb-1.5">Title</label>
+                                <input asp-for="NewStep.Title" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required />
+                                <span asp-validation-for="NewStep.Title" class="text-red-600 text-sm"></span>
+                            </div>
+                            <div class="md:col-span-6">
+                                <label asp-for="NewStep.Instructions" class="block text-sm font-medium text-slate-700 mb-1.5">Instructions</label>
+                                <textarea asp-for="NewStep.Instructions" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" rows="2"></textarea>
+                                <span asp-validation-for="NewStep.Instructions" class="text-red-600 text-sm"></span>
+                            </div>
+                            <div class="md:col-span-2">
+                                @{ var allowSkipName = Html.NameFor(m => m.NewStep.AllowSkip); }
+                                <input type="hidden" name="@allowSkipName" value="false" />
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="@allowSkipName" value="true" id="@Html.IdFor(m => m.NewStep.AllowSkip)" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" @(Model.NewStep.AllowSkip == true ? "checked" : "") />
+                                    <span class="text-sm text-slate-700">Allow Skip</span>
+                                </label>
+                            </div>
+                            <div class="md:col-span-1">
+                                <button type="submit" class="w-full px-4 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-all">Add</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="mb-6 p-4 rounded-xl bg-slate-100 border border-slate-200 text-slate-700">No phases defined yet. Add a phase below.</div>
+    }
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+        <h2 class="text-lg font-semibold text-slate-800 mb-4">Add New Phase</h2>
+        <form method="post" asp-page-handler="AddPhase" class="flex flex-col sm:flex-row gap-4">
+            <div asp-validation-summary="All" class="text-red-600 text-sm sm:col-span-2"></div>
+            <input type="hidden" asp-for="NewPhase.ProcessTemplateId" />
+            <div class="flex-1">
+                <label asp-for="NewPhase.Name" class="block text-sm font-medium text-slate-700 mb-1.5">Phase Name</label>
+                <input asp-for="NewPhase.Name" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" required />
+                <span asp-validation-for="NewPhase.Name" class="text-red-600 text-sm"></span>
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="px-5 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transition-all">Add Phase</button>
+            </div>
+        </form>
+    </div>
+
+</div>
+
+<!-- Preview Step Modal (Tailwind) -->
+<div id="previewStepModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/50 transition-opacity" onclick="closePreviewModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-slate-800">Step Preview</h3>
+                <button type="button" onclick="closePreviewModal()" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700">×</button>
+            </div>
+            <div class="p-6 overflow-auto flex-1" id="previewStepContent">
+                <p class="text-slate-500">Loading preview...</p>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-200">
+                <button type="button" onclick="closePreviewModal()" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        function previewStep(stepId) {
+            var modal = document.getElementById('previewStepModal');
+            var content = document.getElementById('previewStepContent');
+            content.innerHTML = '<p class="text-slate-500">Loading preview...</p>';
+            modal.classList.remove('hidden');
+            fetch('/Templates/PreviewStep?stepId=' + stepId)
+                .then(response => response.text())
+                .then(html => { content.innerHTML = html; })
+                .catch(error => { content.innerHTML = '<p class="text-red-600">Error loading preview: ' + error + '</p>'; });
+        }
+        function closePreviewModal() {
+            document.getElementById('previewStepModal').classList.add('hidden');
+        }
+
+        (function () {
+            // Ensure there is an anti-forgery token on the page for fetch POSTs
+            var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (!tokenEl) return;
+
+            function renumberRows(tbody) {
+                var rows = tbody.querySelectorAll('.js-step-row');
+                rows.forEach(function (r, idx) {
+                    var orderCell = r.querySelector('.js-step-order');
+                    if (orderCell) orderCell.textContent = String(idx + 1);
+                });
+            }
+
+            async function persistOrder(tbody) {
+                var phaseId = parseInt(tbody.dataset.phaseId || '0', 10);
+                if (!phaseId) return;
+                var stepIds = Array.prototype.slice.call(tbody.querySelectorAll('.js-step-row'))
+                    .map(function (r) { return parseInt(r.dataset.stepId || '0', 10); })
+                    .filter(function (id) { return id > 0; });
+
+                // POST JSON to handler
+                var res = await fetch(window.location.pathname + '?handler=ReorderSteps', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': tokenEl.value
+                    },
+                    body: JSON.stringify({ phaseId: phaseId, stepIds: stepIds })
+                });
+                if (!res.ok) {
+                    // Hard refresh so user sees the real order from DB if something goes wrong.
+                    window.location.reload();
+                }
+            }
+
+            document.querySelectorAll('tbody.js-step-sort').forEach(function (tbody) {
+                var dragged = null;
+
+                tbody.addEventListener('dragstart', function (e) {
+                    var row = e.target && e.target.closest ? e.target.closest('.js-step-row') : null;
+                    if (!row) return;
+                    dragged = row;
+                    row.classList.add('bg-blue-50');
+                    e.dataTransfer.effectAllowed = 'move';
+                    try { e.dataTransfer.setData('text/plain', row.dataset.stepId || ''); } catch (_) { }
+                });
+
+                tbody.addEventListener('dragend', function () {
+                    if (dragged) dragged.classList.remove('bg-blue-50');
+                    dragged = null;
+                });
+
+                tbody.addEventListener('dragover', function (e) {
+                    if (!dragged) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    var targetRow = e.target && e.target.closest ? e.target.closest('.js-step-row') : null;
+                    if (!targetRow || targetRow === dragged) return;
+
+                    var rect = targetRow.getBoundingClientRect();
+                    var before = (e.clientY - rect.top) < (rect.height / 2);
+                    if (before) tbody.insertBefore(dragged, targetRow);
+                    else tbody.insertBefore(dragged, targetRow.nextSibling);
+                });
+
+                tbody.addEventListener('drop', function (e) {
+                    if (!dragged) return;
+                    e.preventDefault();
+                    renumberRows(tbody);
+                    persistOrder(tbody);
+                });
+            });
+        })();
+    </script>
+}

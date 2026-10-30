@@ -1,0 +1,88 @@
+@page
+@model ManufacturingTimeTracking.Pages.TimeTracking.DailyReportModel
+@{
+    ViewData["Title"] = "Daily Time Report";
+}
+<style>
+    .dr-surface { background: #071027; color: #f8fafc; padding: 1rem; border-radius: 12px; }
+    .dr-day { border: 1px solid rgba(148,163,184,0.06); padding: .75rem; border-radius: 8px; margin-bottom: .75rem; }
+    .dr-user { padding: .5rem; border-radius:6px; background: rgba(255,255,255,0.02); margin-bottom:.5rem; }
+    .action-chip { display:inline-block; padding:.2rem .5rem; border-radius:6px; font-size:.8rem; color:#0b1220; background:#e2e8f0; margin-right:.5rem; }
+    .time-muted { color: #cbd5e1; font-size:.9rem; }
+</style>
+
+<div class="max-w-5xl mx-auto p-4">
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-xl font-semibold text-white">Daily report</h1>
+        <a asp-page="/TimeTracking/Index" class="px-3 py-2 rounded bg-slate-800 text-white">Back</a>
+    </div>
+
+    <form method="get" class="flex gap-3 items-end mb-4">
+        <div>
+            <label class="block text-sm text-slate-300">User</label>
+            <select asp-for="SelectedUserId" asp-items="Model.UserSelectList" class="input-dark"></select>
+        </div>
+        <div>
+            <label class="block text-sm text-slate-300">Action</label>
+            <select asp-for="SelectedAction" asp-items="Model.ActionSelectList" class="input-dark"></select>
+        </div>
+        <div>
+            <label class="block text-sm text-slate-300">From</label>
+            <input asp-for="FromDate" type="date" class="input-dark" />
+        </div>
+        <div>
+            <label class="block text-sm text-slate-300">To</label>
+            <input asp-for="ToDate" type="date" class="input-dark" />
+        </div>
+        <div>
+            <button type="submit" class="px-4 py-2 rounded bg-sky-600 text-white">Apply</button>
+        </div>
+    </form>
+
+    <div class="dr-surface">
+        @if (!Model.Days.Any())
+        {
+            <p class="text-slate-300">No time tracking entries found for the selected range.</p>
+        }
+        else
+        {
+            foreach (var day in Model.Days)
+            {
+                <div class="dr-day">
+                    <h3 class="text-sm text-slate-200 font-semibold">@day.Date.ToString("yyyy-MM-dd (dddd)")</h3>
+                    <div class="mt-2">
+                        @foreach (var user in day.Users)
+                        {
+                            <div class="dr-user">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="font-medium text-white">@user.DisplayName</div>
+                                    <div class="text-sm text-slate-400">@user.Entries.Count() events</div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-1">
+                                    @foreach (var e in user.Entries)
+                                    {
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-28 time-muted">@e.TimestampLocal.ToString("HH:mm:ss")</div>
+                                            <div>
+                                                <span class="action-chip">@e.ActionType</span>
+                                                @if (!string.IsNullOrEmpty(e.BreakReason))
+                                                {
+                                                    <span class="text-sm text-slate-300">@e.BreakReason</span>
+                                                }
+                                                <div class="text-xs text-slate-400 mt-1">Session: @e.SessionId</div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<style>
+    .input-dark { border: 1px solid rgba(148,163,184,0.08); background: #0f172a; color: #f8fafc; padding: .4rem; border-radius: .375rem; }
+</style>

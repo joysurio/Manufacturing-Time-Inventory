@@ -1,0 +1,217 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.SalesModel
+@using ManufacturingTimeTracking.Models.Execution
+@{
+    ViewData["Title"] = "Sales Orders";
+    string PriorityLabel(int priority) => BuildOrderPriority.DisplayName(priority);
+    string PriorityClass(int priority) => priority switch
+    {
+        BuildOrderPriority.Urgent => "bg-red-500/20 text-red-200",
+        BuildOrderPriority.High => "bg-amber-500/20 text-amber-200",
+        BuildOrderPriority.Low => "bg-slate-500/20 text-slate-200",
+        _ => "bg-blue-500/20 text-blue-200"
+    };
+    string StatusClass(string status) => status switch
+    {
+        "InProgress" => "bg-cyan-500/20 text-cyan-200",
+        "Completed" => "bg-emerald-500/20 text-emerald-200",
+        _ => "bg-slate-500/20 text-slate-200"
+    };
+}
+
+<style>
+    .page-dark { background: #050915; color: #f8fafc; font-weight: 300; }
+    .card-dark {
+        background: rgba(10,15,31,0.92);
+        border: 1px solid rgba(59,130,246,0.45);
+        box-shadow: 0 0 24px rgba(59,130,246,0.28), 0 0 48px rgba(59,130,246,0.18);
+        border-radius: 18px;
+    }
+    .btn-glow {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+        background: #0b1224;
+        color: #f8fafc;
+    }
+    .order-card {
+        border: 1px solid rgba(59,130,246,0.35);
+        background: rgba(15,23,42,0.75);
+        border-radius: 16px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .order-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 20px rgba(59,130,246,0.25);
+    }
+</style>
+
+<div class="animate-fade-in page-dark">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-emerald-300">Sales Orders</h1>
+            <p class="text-slate-300 mt-1">Register sales orders with automatic order numbers. Technicians select an order to start working.</p>
+        </div>
+        <a asp-page="./Index" class="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-slate-500 text-slate-100 text-sm font-medium hover:bg-slate-800 btn-glow w-fit">
+            Full orders list
+        </a>
+    </div>
+
+    @if (Model.CanCreateOrders)
+    {
+        <div class="card-dark p-6 mb-8">
+            <h2 class="text-lg font-semibold text-white mb-1">New sales order</h2>
+            <p class="text-slate-400 text-sm mb-5">Order number and serial are generated automatically.</p>
+
+            <form method="post" asp-page-handler="Create" class="space-y-5">
+                <div asp-validation-summary="ModelOnly" class="p-4 rounded-xl bg-red-500/10 text-red-200 text-sm border border-red-500/30"></div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1.5">Order number (auto)</label>
+                        <input type="text" value="@Model.PreviewOrderNumber" readonly class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900/80 text-emerald-300 font-mono" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1.5">Serial number (auto)</label>
+                        <input type="text" value="@Model.PreviewSerialNumber" readonly class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900/80 text-slate-200 font-mono" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label asp-for="Input.CustomerName" class="block text-sm font-medium text-slate-300 mb-1.5">Customer <span class="text-red-400">*</span></label>
+                        <input asp-for="Input.CustomerName" class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30" />
+                        <span asp-validation-for="Input.CustomerName" class="text-red-400 text-sm mt-1 block"></span>
+                    </div>
+                    <div>
+                        <label asp-for="Input.ProjectRef" class="block text-sm font-medium text-slate-300 mb-1.5">Project reference (optional)</label>
+                        <input asp-for="Input.ProjectRef" class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label asp-for="Input.MachineModelId" class="block text-sm font-medium text-slate-300 mb-1.5">Machine model <span class="text-red-400">*</span></label>
+                        <select asp-for="Input.MachineModelId" asp-items="Model.MachineModels" id="salesModelSelect" class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30">
+                            <option value="">-- Select model --</option>
+                        </select>
+                        <span asp-validation-for="Input.MachineModelId" class="text-red-400 text-sm mt-1 block"></span>
+                    </div>
+                    <div>
+                        <label asp-for="Input.MachineVariantId" class="block text-sm font-medium text-slate-300 mb-1.5">Machine variant <span class="text-red-400">*</span></label>
+                        <select asp-for="Input.MachineVariantId" id="salesVariantSelect" class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30">
+                            <option value="">-- Select variant --</option>
+                        </select>
+                        <span asp-validation-for="Input.MachineVariantId" class="text-red-400 text-sm mt-1 block"></span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                    <div>
+                        <label asp-for="Input.PlannedWeek" class="block text-sm font-medium text-slate-300 mb-1.5">Planned week</label>
+                        <input asp-for="Input.PlannedWeek" class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                    <div>
+                        <label asp-for="Input.DueDate" class="block text-sm font-medium text-slate-300 mb-1.5">Due date</label>
+                        <input asp-for="Input.DueDate" type="date" class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                    <div>
+                        <label asp-for="Input.Priority" class="block text-sm font-medium text-slate-300 mb-1.5">Priority</label>
+                        <select asp-for="Input.Priority" asp-items="Model.PriorityList" class="w-full px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"></select>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" class="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-500 transition-all duration-200">
+                        Create sales order
+                    </button>
+                </div>
+            </form>
+        </div>
+    }
+
+    <div class="card-dark p-6">
+        <h2 class="text-lg font-semibold text-white mb-1">Select an order to start</h2>
+        <p class="text-slate-400 text-sm mb-6">Pick the order you are going to work on. You will be taken to the manufacturing steps.</p>
+
+        @if (!Model.Orders.Any())
+        {
+            <p class="text-slate-300 text-center py-10">No active orders available. @if (Model.CanCreateOrders) { <span>Create a sales order above.</span> }</p>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                @foreach (var order in Model.Orders)
+                {
+                    <div class="order-card p-5 flex flex-col gap-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-xl font-semibold text-emerald-300 font-mono">@order.OrderNumber</p>
+                                @if (!string.IsNullOrWhiteSpace(order.SerialNumber))
+                                {
+                                    <p class="text-sm text-slate-400 font-mono">@order.SerialNumber</p>
+                                }
+                            </div>
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium @PriorityClass(order.Priority)">@PriorityLabel(order.Priority)</span>
+                        </div>
+
+                        <div class="space-y-1 text-sm">
+                            <p class="text-slate-200"><span class="text-slate-400">Customer:</span> @order.CustomerName</p>
+                            <p class="text-slate-200"><span class="text-slate-400">Machine:</span> @order.ModelName / @order.VariantName</p>
+                            <p class="text-slate-200">
+                                <span class="text-slate-400">Status:</span>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium @StatusClass(order.Status)">@order.Status</span>
+                            </p>
+                        </div>
+
+                        <div class="mt-auto pt-2">
+                            <a asp-page="./Execute" asp-route-id="@order.Id"
+                               class="w-full inline-flex items-center justify-center px-4 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 transition-all duration-200 btn-glow">
+                                @(order.HasInProgressExecution ? "Continue order" : "Start order")
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        (function () {
+            var modelSelect = document.getElementById('salesModelSelect');
+            var variantSelect = document.getElementById('salesVariantSelect');
+            if (!modelSelect || !variantSelect) return;
+
+            var selectedVariantId = '@Model.Input.MachineVariantId';
+
+            function loadVariants(modelId) {
+                variantSelect.innerHTML = '<option value="">-- Select variant --</option>';
+                if (!modelId) return;
+                fetch('/api/variants?modelId=' + encodeURIComponent(modelId))
+                    .then(function (response) { return response.json(); })
+                    .then(function (data) {
+                        data.forEach(function (variant) {
+                            var option = document.createElement('option');
+                            option.value = variant.id;
+                            option.textContent = variant.name + ' (' + variant.code + ')';
+                            if (selectedVariantId && String(variant.id) === String(selectedVariantId)) {
+                                option.selected = true;
+                            }
+                            variantSelect.appendChild(option);
+                        });
+                    });
+            }
+
+            modelSelect.addEventListener('change', function () {
+                selectedVariantId = '';
+                loadVariants(this.value);
+            });
+
+            if (modelSelect.value) {
+                loadVariants(modelSelect.value);
+            }
+        })();
+    </script>
+}

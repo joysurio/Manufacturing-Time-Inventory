@@ -1,0 +1,295 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.IndexModel
+@{
+    ViewData["Title"] = "Build Orders";
+}
+
+<style>
+    .page-dark { background: #050915; color: #f8fafc; font-weight: 300; }
+    .card-dark {
+        background: rgba(10,15,31,0.92);
+        border: 1px solid rgba(59,130,246,0.45);
+        box-shadow: 0 0 24px rgba(59,130,246,0.28), 0 0 48px rgba(59,130,246,0.18);
+        border-radius: 18px;
+    }
+    .btn-glow {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+        background: #0b1224;
+        color: #f8fafc;
+    }
+    .table-dark thead { background: rgba(30,41,59,0.75); }
+    .table-dark th { color: #86efac; border-right: 1px solid rgba(255,255,255,0.15); }
+    .table-dark td { color: #e2e8f0; border-right: 1px solid rgba(255,255,255,0.15); }
+    .table-dark th:last-child, .table-dark td:last-child { border-right: none; }
+    .table-dark tr:hover { background: rgba(51,65,85,0.35); }
+    .table-scroll { max-height: 70vh; overflow-y: auto; }
+</style>
+
+<div class="animate-fade-in page-dark">
+    <div class="card-dark p-6">
+     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+         <h1 class="text-2xl font-bold text-emerald-300">Build Orders</h1>
+         <div class="flex flex-wrap gap-3">
+            <a asp-page="./Sales" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-500 shadow-sm w-fit btn-glow">Sales Orders</a>
+            <a asp-page="./ReportTimeByUser" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-slate-500 text-white font-medium hover:bg-slate-700 shadow-sm w-fit btn-glow">Time report</a>
+            <a asp-page="./WeeklyLoad" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-slate-500 text-white font-medium hover:bg-slate-700 shadow-sm w-fit btn-glow">Weekly load</a>
+            <a asp-page="./VarianceReport" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-slate-500 text-white font-medium hover:bg-slate-700 shadow-sm w-fit btn-glow">Variance report</a>
+            <a asp-page="./Blockages" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-amber-400 text-amber-200 font-medium hover:bg-amber-500/20 shadow-sm w-fit btn-glow">Blockages</a>
+            @if (User.IsInRole("Admin") || User.IsInRole("Supervisor"))
+            {
+                <a asp-page="./ReopenedSteps" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-amber-300 text-amber-100 font-medium hover:bg-amber-400/20 shadow-sm w-fit btn-glow">
+                    Reopened steps
+                </a>
+            }
+            <a asp-page="Create" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-black text-white font-medium hover:bg-slate-800 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 w-fit btn-glow">
+                <span class="inline-block">➕</span>
+                Create New Order
+            </a>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-4">
+        <span class="text-slate-200 text-sm font-medium self-center mr-2">Show:</span>
+        <a asp-page="./Index" asp-route-StatusFilter="Active" asp-route-PageNumber="1" class="inline-flex px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 @(Model.StatusFilter == "Active" ? "bg-cyan-500 text-white" : "border border-slate-600 text-slate-100 hover:bg-slate-800")">Active</a>
+        <a asp-page="./Index" asp-route-StatusFilter="Completed" asp-route-PageNumber="1" class="inline-flex px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 @(Model.StatusFilter == "Completed" ? "bg-emerald-500 text-white" : "border border-slate-600 text-slate-100 hover:bg-slate-800")">Completed</a>
+        <a asp-page="./Index" asp-route-StatusFilter="All" asp-route-PageNumber="1" class="inline-flex px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 @(Model.StatusFilter == "All" ? "bg-slate-500 text-white" : "border border-slate-600 text-slate-100 hover:bg-slate-800")">All</a>
+    </div>
+
+    <div class="card-dark overflow-hidden">
+        <div class="overflow-x-auto table-scroll">
+            <form method="get" id="orders-filter-form">
+                <input type="hidden" name="StatusFilter" value="@Model.StatusFilter" />
+                <input type="hidden" name="PageSize" value="@Model.PageSize" />
+                <input type="hidden" name="PageNumber" value="1" />
+                <table id="orders-table" class="min-w-full table-fixed w-full text-sm table-dark divide-y divide-slate-700">
+                <thead>
+                     <tr>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold uppercase tracking-wider">External Ref</th>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold uppercase tracking-wider">Serial Number</th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold uppercase tracking-wider">Model</th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold uppercase tracking-wider">Variant</th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold uppercase tracking-wider">Client</th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-4 w-4/12 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
+                     </tr>
+                    <tr class="bg-slate-900/80">
+                        <th class="px-2 py-2">
+                            <input data-col="0" list="col-0-options" type="text" name="ExternalRefFilter" value="@Model.ExternalRefFilter" placeholder="Filtrar..." class="w-full px-2 py-1 text-sm rounded bg-slate-900 text-slate-100 border border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 col-filter" />
+                        </th>
+                        <th class="px-2 py-2">
+                            <input data-col="1" list="col-1-options" type="text" name="SerialNumberFilter" value="@Model.SerialNumberFilter" placeholder="Filtrar..." class="w-full px-2 py-1 text-sm rounded bg-slate-900 text-slate-100 border border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 col-filter" />
+                        </th>
+                        <th class="px-2 py-2">
+                            <input data-col="2" list="col-2-options" type="text" name="ModelFilter" value="@Model.ModelFilter" placeholder="Filtrar..." class="w-full px-2 py-1 text-sm rounded bg-slate-900 text-slate-100 border border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 col-filter" />
+                        </th>
+                        <th class="px-2 py-2">
+                            <input data-col="3" list="col-3-options" type="text" name="VariantFilter" value="@Model.VariantFilter" placeholder="Filtrar..." class="w-full px-2 py-1 text-sm rounded bg-slate-900 text-slate-100 border border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 col-filter" />
+                        </th>
+                        <th class="px-2 py-2">
+                            <input data-col="4" list="col-4-options" type="text" name="ClientFilter" value="@Model.ClientFilter" placeholder="Filtrar..." class="w-full px-2 py-1 text-sm rounded bg-slate-900 text-slate-100 border border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 col-filter" />
+                        </th>
+                        <th class="px-2 py-2">
+                            <input data-col="5" list="col-5-options" type="text" name="StatusTextFilter" value="@Model.StatusTextFilter" placeholder="Filtrar..." class="w-full px-2 py-1 text-sm rounded bg-slate-900 text-slate-100 border border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 col-filter" />
+                        </th>
+                        <th class="px-2 py-2">
+                            <input data-col="6" list="col-6-options" type="text" name="CreatedFilter" value="@Model.CreatedFilter" placeholder="Filtrar..." class="w-full px-2 py-1 text-sm rounded bg-slate-900 text-slate-100 border border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 col-filter" />
+                        </th>
+                        <th class="px-2 py-2">
+                            <div class="flex items-center justify-center gap-2">
+                                <button type="submit" class="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-cyan-600 text-white text-xs font-semibold hover:bg-cyan-700 transition-all duration-200 btn-glow">
+                                    Search
+                                </button>
+                                <a asp-page="./Index" asp-route-StatusFilter="@Model.StatusFilter" asp-route-PageNumber="1" asp-route-PageSize="@Model.PageSize"
+                                   class="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-slate-500 text-slate-100 text-xs font-semibold hover:bg-slate-800 transition-all duration-200">
+                                    Clear
+                                </a>
+                            </div>
+                        </th>
+                    </tr>
+                 </thead>
+                <tbody class="divide-y divide-slate-800">
+                     @foreach (var order in Model.BuildOrders)
+                     {
+                        <tr class="transition-colors duration-150 @(order.IsBlocked ? "bg-amber-500/10" : "")">
+                            <td class="px-6 py-4 w-1/12 text-center font-medium text-white">@order.ExternalRef</td>
+                            <td class="px-6 py-4 w-2/12 text-center text-slate-200">@order.SerialNumber</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@(Model.ModelNames.TryGetValue(order.MachineModelId, out var mn) ? mn : $"Model {order.MachineModelId}")</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@(Model.VariantNames.TryGetValue(order.MachineVariantId, out var vn) ? vn : $"Variant {order.MachineVariantId}")</td>
+                            <td class="px-6 py-4 w-1/12 text-center text-slate-200">@order.CustomerName</td>
+                            <td class="px-6 py-4 w-1/12 text-center">
+                                 @{
+                                     var statusClass = order.Status == "InProgress" ? "bg-slate-700 text-cyan-300" : order.Status == "Completed" ? "bg-emerald-200/30 text-emerald-100" : "bg-slate-200/20 text-slate-100";
+                                 }
+                                 <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-medium @statusClass">@order.Status</span>
+                                 @if (order.IsBlocked)
+                                 {
+                                     <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-red-200/30 text-red-100 ml-1" title="@(order.BlockedReason?.Name) — @order.BlockedNotes">Blocked</span>
+                                 }
+                             </td>
+                            <td class="px-6 py-4 text-center w-2/12 text-slate-200 text-sm">@order.CreatedAt.ToString("g")</td>
+                            <td class="px-6 py-4 text-center w-4/12">
+                                 <div class="grid grid-cols-2 gap-2 justify-items-center">
+                                     @if (!order.IsBlocked && (order.Status == "Pending" || order.Status == "InProgress"))
+                                     {
+                                        <a asp-page="./Execute" asp-route-id="@order.Id" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-all duration-200 btn-glow">Execute</a>
+                                        <form method="post" asp-page-handler="CompleteOrder" asp-route-id="@order.Id" class="w-full" onsubmit="return confirm('Mark this order as completed?');">
+                                            <input type="hidden" name="StatusFilter" value="@Model.StatusFilter" />
+                                            <input type="hidden" name="PageNumber" value="@Model.PageNumber" />
+                                            <input type="hidden" name="PageSize" value="@Model.PageSize" />
+                                            <button type="submit" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-all duration-200 btn-glow">Complete Order</button>
+                                        </form>
+                                     }
+                                     @if ((User.IsInRole("Admin") || User.IsInRole("Supervisor")) && order.Status == "Completed")
+                                     {
+                                        <form method="post" asp-page-handler="ReopenOrder" asp-route-id="@order.Id" class="w-full" onsubmit="return confirm('Reopen this order as pending?');">
+                                            <input type="hidden" name="StatusFilter" value="@Model.StatusFilter" />
+                                            <input type="hidden" name="PageNumber" value="@Model.PageNumber" />
+                                            <input type="hidden" name="PageSize" value="@Model.PageSize" />
+                                            <button type="submit" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-all duration-200 btn-glow">Reopen</button>
+                                        </form>
+                                     }
+                                     @if ((User.IsInRole("Admin") || User.IsInRole("Supervisor")) && order.IsBlocked)
+                                     {
+                                        <a asp-page="./Unblock" asp-route-id="@order.Id" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-all duration-200 btn-glow">Unblock</a>
+                                     }
+                                     @if ((User.IsInRole("Admin") || User.IsInRole("Supervisor")) && !order.IsBlocked)
+                                     {
+                                        <a asp-page="./Block" asp-route-id="@order.Id" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-all duration-200 btn-glow">Block</a>
+                                     }
+                                     @if (User.IsInRole("Admin") && order.Status == "Pending")
+                                     {
+                                         <a asp-page="./Edit" asp-route-id="@order.Id" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-amber-400 text-amber-100 text-sm font-medium hover:bg-amber-500/20 transition-all duration-200 btn-glow">Edit</a>
+                                     }
+                                     @if (User.IsInRole("Admin"))
+                                     {
+                                        <a asp-page="./Delete" asp-route-id="@order.Id" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-red-900/30" aria-label="Delete">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="white" stroke="red" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M3 6h18" />
+                                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                <path d="M10 11v6" />
+                                                <path d="M14 11v6" />
+                                                <path d="M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" />
+                                            </svg>
+                                        </a>
+                                     }
+                                    <a asp-page="./Details" asp-route-id="@order.Id" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-slate-500 text-white text-sm font-medium hover:bg-slate-700 transition-all duration-200 btn-glow">Details</a>
+                                    <a asp-page="./PickList" asp-route-id="@order.Id" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition-all duration-200 btn-glow">Pick list</a>
+                                    <a asp-page="./Summary" asp-route-id="@order.Id" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-emerald-500/20">Summary</a>
+                                 </div>
+                             </td>
+                         </tr>
+                     }
+                </tbody>
+            </table>
+            </form>
+        </div>
+        <partial name="_Pagination" model="Model.Pagination" />
+    </div>
+    </div>
+</div>
+
+<datalist id="col-0-options"></datalist>
+<datalist id="col-1-options"></datalist>
+<datalist id="col-2-options"></datalist>
+<datalist id="col-3-options"></datalist>
+<datalist id="col-4-options"></datalist>
+<datalist id="col-5-options"></datalist>
+<datalist id="col-6-options"></datalist>
+<datalist id="col-7-options"></datalist>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById('orders-filter-form');
+            const table = document.getElementById('orders-table');
+            const filters = table?.querySelectorAll('.col-filter');
+            const rows = table?.querySelectorAll('tbody tr') || [];
+            if (!filters) return;
+
+            const uniques = {};
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                cells.forEach((cell, idx) => {
+                    const key = `col-${idx}`;
+                    uniques[key] = uniques[key] || new Set();
+                    const text = (cell.textContent || '').trim();
+                    if (text) uniques[key].add(text);
+                });
+            });
+            Object.keys(uniques).forEach(key => {
+                const list = document.getElementById(`${key}-options`);
+                if (!list) return;
+                list.innerHTML = '';
+                uniques[key].forEach(val => {
+                    const option = document.createElement('option');
+                    option.value = val;
+                    list.appendChild(option);
+                });
+            });
+
+            // While typing, we do two things:
+            // - Local filter for immediate feedback on the current page
+            // - Debounced GET submit so the filter applies across pagination (server-side)
+            let submitTimer = null;
+            const STORAGE_KEY = 'mti_orders_last_filter_name';
+
+            filters.forEach(input => {
+                input.addEventListener('input', function () {
+                    applyFilters();
+
+                    // Remember which input was used so we can restore focus after reload.
+                    if (input && input.name) {
+                        try { sessionStorage.setItem(STORAGE_KEY, input.name); } catch (e) { }
+                    }
+
+                    // Debounced submit to apply filtering across all pages.
+                    if (!form) return;
+                    if (submitTimer) window.clearTimeout(submitTimer);
+                    submitTimer = window.setTimeout(function () {
+                        form.submit();
+                    }, 350);
+                });
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (form) form.submit();
+                    }
+                });
+            });
+
+            function applyFilters() {
+                const criteria = Array.from(filters).map(f => (f.value || '').trim().toLowerCase());
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    const match = criteria.every((crit, idx) => {
+                        if (!crit) return true;
+                        const cell = cells[idx];
+                        if (!cell) return true;
+                        return (cell.textContent || '').toLowerCase().includes(crit);
+                    });
+                    row.style.display = match ? '' : 'none';
+                });
+            }
+
+            // Apply local filter on load too (so the current page reflects any pre-filled filters).
+            applyFilters();
+
+            // Restore focus to the last edited filter input after reload/pagination.
+            window.requestAnimationFrame(function () {
+                if (!form) return;
+                let lastName = null;
+                try { lastName = sessionStorage.getItem(STORAGE_KEY); } catch (e) { }
+                if (!lastName) return;
+                const el = form.querySelector(`input[name="${CSS.escape(lastName)}"]`);
+                if (!el) return;
+                try {
+                    el.focus();
+                    const len = (el.value || '').length;
+                    el.setSelectionRange(len, len);
+                } catch (e) { }
+            });
+        })();
+    </script>
+}

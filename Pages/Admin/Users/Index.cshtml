@@ -1,0 +1,140 @@
+@page
+@model ManufacturingTimeTracking.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = "Manage Users & Roles";
+}
+
+<style>
+    .pm-card { min-height: 170px; }
+    .pm-k { font-size: 9px; letter-spacing: .08em; }
+    .pm-glow { position: relative; border-color: var(--pm-glow-color, #38bdf8); }
+    .pm-glow::after {
+        content: "";
+        position: absolute;
+        inset: -3px;
+        border-radius: 0.9rem;
+        pointer-events: none;
+        box-shadow:
+          0 0 0 3px color-mix(in srgb, var(--pm-glow-color, #38bdf8) 85%, transparent),
+          0 0 0 8px color-mix(in srgb, var(--pm-glow-color, #38bdf8) 35%, transparent),
+          0 18px 45px color-mix(in srgb, var(--pm-glow-color, #38bdf8) 28%, transparent);
+    }
+    .btn-glow {
+        position: relative;
+        box-shadow:
+            0 0 0 2px rgba(59,130,246,0.35),
+            0 0 15px rgba(59,130,246,0.6),
+            0 14px 30px rgba(59,130,246,0.35);
+    }
+</style>
+
+<div class="animate-fade-in bg-slate-950 text-white rounded-3xl shadow-soft p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+        <div class="min-w-0">
+            <h1 class="text-2xl font-bold text-white">Manage Users & Roles</h1>
+            <p class="text-slate-200 text-sm">Create users, assign roles, and reset passwords.</p>
+        </div>
+        <button type="button" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-all duration-200 shrink-0" data-modal-show="createUserModal">+ Create user</button>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+        @{ var glowPalette = new[] { "#f59e0b", "#ef4444", "#22c55e", "#38bdf8", "#a855f7" }; var idx = 0; }
+        @foreach (var u in Model.Users)
+        {
+            var glow = glowPalette[idx % glowPalette.Length];
+            idx++;
+            <div class="pm-card pm-glow rounded-xl border bg-slate-900 overflow-hidden" style="--pm-glow-color:@glow; border-color:@glow">
+                <div class="px-4 py-3 border-b" style="border-color: color-mix(in srgb, @glow 70%, transparent)">
+                    <div class="text-lg font-semibold text-white truncate">@(string.IsNullOrWhiteSpace(u.FirstName) && string.IsNullOrWhiteSpace(u.LastName) ? u.Email : $"{u.FirstName} {u.LastName}".Trim())</div>
+                    <div class="text-sm text-slate-300 truncate">@u.Email</div>
+                    @if (!string.IsNullOrWhiteSpace(u.Dni))
+                    {
+                        <div class="text-xs text-slate-400">DNI: @u.Dni</div>
+                    }
+                </div>
+                <div class="p-4 space-y-3">
+                    <div>
+                        <div class="pm-k uppercase tracking-wider text-slate-400">Roles</div>
+                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold" style="background-color: color-mix(in srgb, @glow 20%, transparent); color:@glow">@u.Roles</span>
+                    </div>
+                    <div>
+                        <div class="pm-k uppercase tracking-wider text-slate-400">Acciones</div>
+                        <a asp-page="./Edit" asp-route-id="@u.Id" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 border border-slate-600 transition-all duration-200 btn-glow">Edit role & password</a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="mt-6 p-4 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 text-sm">
+        <strong class="text-white">Roles:</strong> Admin (full access, manage users), Supervisor (edit templates & add steps/instructions), Operator (time tracking, add/edit steps & instructions), Inventory (inventory only), Normal (view/execute only, no step edits, no prices).
+    </div>
+</div>
+
+<div class="tw-modal fixed inset-0 z-[100] hidden" id="createUserModal" role="dialog" aria-labelledby="createUserModalTitle" aria-modal="true">
+    <div class="fixed inset-0 bg-black/50" data-modal-close="createUserModal" aria-hidden="true"></div>
+    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl shadow-xl bg-slate-800 border border-slate-600 text-white z-10">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-600">
+            <h2 class="text-lg font-semibold" id="createUserModalTitle">Create User</h2>
+            <button type="button" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700" data-modal-close="createUserModal" aria-label="Close">&times;</button>
+        </div>
+        <form method="post" asp-page-handler="CreateUser" asp-antiforgery="true">
+            <div class="p-6 space-y-4">
+                <!-- <div asp-validation-summary="All" class="rounded-lg bg-red-900/30 text-red-200 py-2 px-3 text-sm mb-2"></div> -->
+                <div>
+                    <label asp-for="CreateUserInput.FirstName" class="block text-sm font-medium text-slate-200 mb-1">First name</label>
+                    <input asp-for="CreateUserInput.FirstName" class="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label asp-for="CreateUserInput.LastName" class="block text-sm font-medium text-slate-200 mb-1">Last name</label>
+                    <input asp-for="CreateUserInput.LastName" class="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label asp-for="CreateUserInput.Dni" class="block text-sm font-medium text-slate-200 mb-1">DNI</label>
+                    <input asp-for="CreateUserInput.Dni" class="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label asp-for="CreateUserInput.Email" class="block text-sm font-medium text-slate-200 mb-1">Email <span class="text-red-400">*</span></label>
+                    <input asp-for="CreateUserInput.Email" class="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" type="email" autocomplete="username" />
+                    <span asp-validation-for="CreateUserInput.Email" class="text-red-400 text-sm mt-1 block"></span>
+                </div>
+                <div>
+                    <label asp-for="CreateUserInput.UserName" class="block text-sm font-medium text-slate-200 mb-1">User name (optional)</label>
+                    <input asp-for="CreateUserInput.UserName" class="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="username" />
+                    <span class="text-slate-400 text-xs block mt-1">Leave blank to use email.</span>
+                    <span asp-validation-for="CreateUserInput.UserName" class="text-red-400 text-sm mt-1 block"></span>
+                </div>
+                <div>
+                    <label asp-for="CreateUserInput.Password" class="block text-sm font-medium text-slate-200 mb-1">Password <span class="text-red-400">*</span></label>
+                    <input asp-for="CreateUserInput.Password" class="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="new-password" />
+                    <span asp-validation-for="CreateUserInput.Password" class="text-red-400 text-sm mt-1 block"></span>
+                </div>
+                <div>
+                    <label asp-for="CreateUserInput.ConfirmPassword" class="block text-sm font-medium text-slate-200 mb-1">Confirm password <span class="text-red-400">*</span></label>
+                    <input asp-for="CreateUserInput.ConfirmPassword" class="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="new-password" />
+                    <span asp-validation-for="CreateUserInput.ConfirmPassword" class="text-red-400 text-sm mt-1 block"></span>
+                </div>
+                <div>
+                    <label asp-for="CreateUserInput.Role" class="block text-sm font-medium text-slate-200 mb-1">Role <span class="text-red-400">*</span></label>
+                    <select asp-for="CreateUserInput.Role" asp-items="Model.RoleList" class="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select role</option>
+                    </select>
+                    <span asp-validation-for="CreateUserInput.Role" class="text-red-400 text-sm mt-1 block"></span>
+                </div>
+            </div>
+            <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-600">
+                <button type="button" class="px-4 py-2 rounded-lg border border-slate-500 text-slate-300 hover:bg-slate-600 transition-colors" data-modal-close="createUserModal">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">Create User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.ShowCreateUserModal)
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.showModal) window.showModal('createUserModal');
+        });
+    </script>
+}

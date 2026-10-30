@@ -1,0 +1,200 @@
+@page
+@model ManufacturingTimeTracking.Pages.Materials.IndexModel
+@{
+    ViewData["Title"] = "Materials";
+}
+
+<style>
+    .page-dark { background: #050915; color: #f8fafc; font-weight: 300; }
+    .card-dark {
+        background: rgba(10,15,31,0.92);
+        border: 1px solid rgba(59,130,246,0.45);
+        box-shadow: 0 0 24px rgba(59,130,246,0.28), 0 0 48px rgba(59,130,246,0.18);
+        border-radius: 18px;
+    }
+    .btn-glow {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+        background: #0b1224;
+        color: #f8fafc;
+    }
+    .table-dark thead { background: rgba(30,41,59,0.75); }
+    .table-dark th { color: #cbd5e1; border-right: 1px solid rgba(255,255,255,0.15); }
+    .table-dark td { color: #e2e8f0; border-right: 1px solid rgba(255,255,255,0.15); }
+    .table-dark th:last-child, .table-dark td:last-child { border-right: none; }
+    .table-dark tr:hover { background: rgba(51,65,85,0.35); }
+    .row-low { background: rgba(248,113,113,0.12); }
+    .modal-dark { background: rgba(10,15,31,0.98); color: #f8fafc; }
+    .table-scroll { max-height: 70vh; overflow-y: auto; }
+</style>
+
+<div class="animate-fade-in page-dark">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-semibold text-white">Materials</h1>
+        <a asp-page="Create" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl btn-glow font-medium hover:bg-slate-900 transition-all duration-200 w-fit">Create New Material</a>
+    </div>
+    <form method="get" id="materials-search-form" class="mb-6 flex flex-wrap gap-3 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <input type="text" id="materials-search-input" name="Search" value="@Model.Search" class="w-full px-4 py-2.5 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 transition-all duration-200" placeholder="Search by name, reference, QR, supplier..." />
+        </div>
+        <button type="submit" class="px-5 py-2.5 rounded-xl btn-glow font-medium hover:bg-slate-900 transition-all duration-200">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Model.Search))
+        {
+            <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-600 text-slate-100 font-medium hover:bg-slate-800 transition-all duration-200">Clear</a>
+        }
+    </form>
+    <div class="card-dark overflow-hidden">
+        <div class="overflow-x-auto table-scroll">
+             <table class="min-w-full divide-y divide-slate-700 table-fixed w-full table-dark">
+                <thead>
+                     <tr>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold uppercase tracking-wider">Image</th>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold uppercase tracking-wider">QR</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold uppercase tracking-wider">Unit</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold uppercase tracking-wider">Price</th>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold uppercase tracking-wider">Supplier</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold uppercase tracking-wider">Location</th>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold uppercase tracking-wider">Actions</th>
+                     </tr>
+                 </thead>
+                <tbody class="divide-y divide-slate-800">
+                    @foreach (var material in Model.Materials)
+                    {
+                        var currentStock = Model.StockByMaterialId.GetValueOrDefault(material.Id, 0);
+                        var belowMin = material.MinimumStock > 0 && currentStock < material.MinimumStock;
+                        <tr class="transition-colors duration-150 cursor-pointer @(belowMin ? "row-low" : "")" onclick='window.location.href="@Url.Page("./Edit", new { id = material.Id })";'>
+                            <td class="px-6 py-4 text-center w-1/12" onclick="event.stopPropagation();">
+                                @if (!string.IsNullOrEmpty(material.ImageUrl))
+                                {
+                                    <img src="~/uploads/@material.ImageUrl" alt="@material.Name" class="rounded-lg object-cover h-12 w-12" />
+                                }
+                                else
+                                {
+                                    <span class="text-slate-500">—</span>
+                                }
+                            </td>
+                            <td class="px-6 py-4 text-center w-2/12 font-medium @(belowMin ? "text-red-200" : "text-white")">
+                                <a asp-page="./Edit" asp-route-id="@material.Id" class="@(belowMin ? "text-red-300 hover:text-red-200 hover:underline" : "text-blue-300 hover:text-blue-200 hover:underline")" onclick="event.stopPropagation();">@material.Name</a>
+                            </td>
+                            <td class="px-6 py-4 text-center w-2/12 text-slate-200 text-sm">@(material.Qr ?? "—")</td>
+                            <td class="px-6 py-4 text-center w-1/12 text-slate-200">@(material.Unit ?? "—")</td>
+                            <td class="px-6 py-4 text-center w-1/12 text-slate-200">@(material.Price.HasValue ? material.Price.Value.ToString("N2") : "—")</td>
+                            <td class="px-6 py-4 text-center w-2/12 text-slate-200">@(material.Supplier?.Name ?? "—")</td>
+                            <td class="px-6 py-4 text-center w-1/12 text-slate-200">@(material.Location?.Code ?? "—")</td>
+                            <td class="px-6 py-4 text-center w-2/12" onclick="event.stopPropagation();">
+                                @if (!string.IsNullOrEmpty(material.Qr))
+                                {
+                                    <div class="inline-flex items-center gap-2 justify-center">
+                                        <button type="button" class="print-qr-btn inline-flex items-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-slate-900" data-material='@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new { name = material.Name, qr = material.Qr }).Replace("\"", "&quot;"))'>Print QR</button>
+                                        <a asp-page="./Edit" asp-route-id="@material.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-slate-900">Edit</a>
+                                        <a asp-page="./Delete" asp-route-id="@material.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-red-900/30">Delete</a>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="inline-flex items-center gap-2 justify-center">
+                                        <a asp-page="./Edit" asp-route-id="@material.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-slate-900">Edit</a>
+                                        <a asp-page="./Delete" asp-route-id="@material.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:bg-red-900/30">Delete</a>
+                                    </div>
+                                }
+                             </td>
+                        </tr>
+                    }
+                 </tbody>
+             </table>
+         </div>
+         <partial name="_Pagination" model="Model.Pagination" />
+     </div>
+ </div>
+
+<!-- Print QR Modal -->
+<div id="printQrModal" style="display: none;" class="fixed inset-0 z-[100] overflow-y-auto" aria-hidden="true">
+    <div class="flex min-h-full w-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-slate-900/60" onclick="closePrintQrModal()" aria-hidden="true"></div>
+        <div class="relative z-10 modal-dark rounded-2xl shadow-xl max-w-sm w-full p-6 mx-auto">
+            <div class="print-only-content text-center">
+                <h2 id="printQrMaterialName" class="text-xl font-bold text-white mb-2"></h2>
+                <p id="printQrCodeText" class="text-sm text-slate-200 mb-4"></p>
+                <img id="printQrImage" src="" alt="QR Code" class="mx-auto border border-slate-700 rounded-lg w-48 h-48" />
+            </div>
+            <div class="no-print mt-6 flex gap-2 justify-center">
+                <button type="button" onclick="printQrContent()" class="px-5 py-2.5 rounded-xl btn-glow font-medium hover:bg-slate-900">Print</button>
+                <button type="button" onclick="closePrintQrModal()" class="px-5 py-2.5 rounded-xl border border-slate-600 text-slate-100 font-medium hover:bg-slate-800">Close</button>
+            </div>
+        </div>
+     </div>
+ </div>
+
+@section Scripts {
+<style>
+    @@media print {
+        body * { visibility: hidden; }
+        #printQrModal, #printQrModal * { visibility: visible; }
+        #printQrModal { position: fixed; inset: 0; background: white; z-index: 9999; display: flex !important; align-items: center; justify-content: center; }
+        #printQrModal .no-print { display: none !important; }
+        #printQrModal .print-only-content { position: static; }
+    }
+</style>
+<script>
+    function openPrintQrModal(name, qr) {
+        document.getElementById('printQrMaterialName').textContent = name || '';
+        document.getElementById('printQrCodeText').textContent = qr || '';
+        document.getElementById('printQrImage').src = qr ? ('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qr)) : '';
+        var modal = document.getElementById('printQrModal');
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+    function closePrintQrModal() {
+        var modal = document.getElementById('printQrModal');
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+    function printQrContent() {
+        window.print();
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.print-qr-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var raw = btn.getAttribute('data-material');
+                if (!raw) return;
+                try {
+                    var d = JSON.parse(raw);
+                    openPrintQrModal(d.name, d.qr);
+                } catch (err) {
+                    console.error('Print QR: invalid data', err);
+                }
+            });
+        });
+
+        // Debounced server-side search while typing (works across pagination).
+        var form = document.getElementById('materials-search-form');
+        var input = document.getElementById('materials-search-input');
+        if (form && input) {
+            var t = null;
+            var STORAGE_KEY = 'mti_materials_search_focus';
+            input.addEventListener('input', function () {
+                try { sessionStorage.setItem(STORAGE_KEY, '1'); } catch (e) { }
+                if (t) window.clearTimeout(t);
+                t = window.setTimeout(function () {
+                    form.submit();
+                }, 350);
+            });
+
+            window.requestAnimationFrame(function () {
+                var shouldFocus = false;
+                try { shouldFocus = sessionStorage.getItem(STORAGE_KEY) === '1'; } catch (e) { }
+                if (!shouldFocus) return;
+                try {
+                    input.focus();
+                    var len = (input.value || '').length;
+                    input.setSelectionRange(len, len);
+                } catch (e) { }
+            });
+        }
+    });
+</script>
+}

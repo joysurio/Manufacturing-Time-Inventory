@@ -1,0 +1,24 @@
+@page
+@model ManufacturingTimeTracking.Pages.Account.SessionRequiredModel
+@{
+    ViewData["Title"] = "Session required";
+}
+
+<div class="max-w-md mx-auto animate-slide-up">
+    <div class="bg-white rounded-2xl shadow-card border border-slate-100 overflow-hidden">
+        <div class="px-8 pt-8 pb-6">
+            <h1 class="text-2xl font-bold text-slate-800">You must log in</h1>
+            <p class="text-slate-600 text-sm mt-2">
+                You are not authenticated or your session has expired. Log in to continue.
+            </p>
+
+            <div class="mt-6">
+                <a asp-page="/Account/Login"
+                   asp-route-returnUrl="@Model.ReturnUrl"
+                   class="inline-flex items-center justify-center w-full py-3.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all duration-200">
+                    Go to Login
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,149 @@
+@page
+@model ManufacturingTimeTracking.Pages.Materials.EditModel
+@{
+    ViewData["Title"] = "Edit Material";
+}
+
+<div class="animate-fade-in w-full">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Edit Material</h1>
+    <p class="text-slate-500 mb-6">Update material details.</p>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 max-w-4xl mx-auto">
+        <form method="post" enctype="multipart/form-data" class="space-y-5">
+            <div asp-validation-summary="ModelOnly" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm"></div>
+            <input type="hidden" asp-for="Material.Id" />
+            <input type="hidden" asp-for="Material.ImageUrl" />
+            <div>
+                <label asp-for="Material.Name" class="block text-sm font-medium text-slate-700 mb-1.5">Name</label>
+                <input asp-for="Material.Name" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                <span asp-validation-for="Material.Name" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="Material.Qr" class="block text-sm font-medium text-slate-700 mb-1.5">QR</label>
+                <div class="flex gap-2">
+                    <input asp-for="Material.Qr" id="Material_Qr" class="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" placeholder="Enter or generate" />
+                    <button type="button" id="btnGenerateQr" class="px-4 py-3 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 whitespace-nowrap">Generate</button>
+                </div>
+            </div>
+            <div>
+                <label asp-for="Material.Price" class="block text-sm font-medium text-slate-700 mb-1.5">Price</label>
+                <input asp-for="Material.Price" type="number" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                <span asp-validation-for="Material.Price" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="Material.SupplierId" class="block text-sm font-medium text-slate-700 mb-1.5">Supplier</label>
+                @{
+                    var supplierText = Model.Suppliers.FirstOrDefault(x => x.Value == (Model.Material.SupplierId?.ToString() ?? ""))?.Text ?? "";
+                }
+                <datalist id="suppliersDatalist">
+                    @foreach (var s in Model.Suppliers)
+                    {
+                        <option value="@s.Text" data-id="@s.Value"></option>
+                    }
+                </datalist>
+                <input type="hidden" asp-for="Material.SupplierId" id="SupplierId" />
+                <input type="text"
+                       id="SupplierText"
+                       list="suppliersDatalist"
+                       class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                       placeholder="Type supplier name…"
+                       autocomplete="off"
+                       value="@supplierText" />
+            </div>
+            <div>
+                <label asp-for="Material.LocationId" class="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
+                @{
+                    var locationText = Model.Locations.FirstOrDefault(x => x.Value == (Model.Material.LocationId?.ToString() ?? ""))?.Text ?? "";
+                }
+                <datalist id="locationsDatalist">
+                    @foreach (var l in Model.Locations)
+                    {
+                        <option value="@l.Text" data-id="@l.Value"></option>
+                    }
+                </datalist>
+                <input type="hidden" asp-for="Material.LocationId" id="LocationId" />
+                <input type="text"
+                       id="LocationText"
+                       list="locationsDatalist"
+                       class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                       placeholder="Type location code…"
+                       autocomplete="off"
+                       value="@locationText" />
+            </div>
+            <div>
+                <label asp-for="Material.MinimumStock" class="block text-sm font-medium text-slate-700 mb-1.5">Minimum Stock</label>
+                <input asp-for="Material.MinimumStock" type="number" min="0" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                <p class="text-slate-500 text-sm mt-1">Alert when current stock falls below this value. Use 0 for no alert.</p>
+            </div>
+            <div>
+                <label asp-for="Stock" class="block text-sm font-medium text-slate-700 mb-1.5">Stock (quantity at location)</label>
+                <input asp-for="Stock" type="number" min="0" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                <p class="text-slate-500 text-sm mt-1">Quantity at the selected location. Change here to record reception or adjustment.</p>
+                <span asp-validation-for="Stock" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="Material.Unit" class="block text-sm font-medium text-slate-700 mb-1.5">Unit</label>
+                <input asp-for="Material.Unit" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                <span asp-validation-for="Material.Unit" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="ImageFile" class="block text-sm font-medium text-slate-700 mb-1.5">Image (Optional)</label>
+                @if (!string.IsNullOrEmpty(Model.Material.ImageUrl))
+                {
+                    <div class="mb-2">
+                        <img src="~/uploads/@Model.Material.ImageUrl" alt="@Model.Material.Name" class="rounded-lg object-cover h-24 max-w-[200px]" />
+                        <p class="text-slate-500 text-sm mt-1">Current image</p>
+                    </div>
+                }
+                <input type="file" asp-for="ImageFile" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700" accept="image/jpeg,image/jpg,image/png,image/gif" />
+                <p class="text-slate-500 text-sm mt-1">Supported: JPEG, JPG, PNG, GIF. Leave empty to keep current image.</p>
+            </div>
+            <div>
+                <label asp-for="Material.Reference" class="block text-sm font-medium text-slate-700 mb-1.5">Reference</label>
+                <input asp-for="Material.Reference" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" placeholder="Supplier part number or reference" />
+            </div>
+            <div>
+                <label asp-for="Material.Notes" class="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+                <textarea asp-for="Material.Notes" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" rows="3" placeholder="Optional notes"></textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+            <div class="m-auto">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transition-all duration-200">Save</button>
+                <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">Back to List</a>
+            </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        (function () {
+            function resolveId(listId, text) {
+                var dl = document.getElementById(listId);
+                if (!dl) return '';
+                var val = (text || '').trim();
+                if (!val) return '';
+                var opt = dl.querySelector('option[value="' + CSS.escape(val) + '"]');
+                return opt ? (opt.getAttribute('data-id') || '') : '';
+            }
+
+            function wire(listId, textId, hiddenId) {
+                var textEl = document.getElementById(textId);
+                var hiddenEl = document.getElementById(hiddenId);
+                if (!textEl || !hiddenEl) return;
+                function sync() { hiddenEl.value = resolveId(listId, textEl.value); }
+                textEl.addEventListener('change', sync);
+                textEl.addEventListener('blur', sync);
+            }
+
+            wire('suppliersDatalist', 'SupplierText', 'SupplierId');
+            wire('locationsDatalist', 'LocationText', 'LocationId');
+        })();
+
+        document.getElementById('btnGenerateQr').addEventListener('click', function() {
+            var input = document.getElementById('Material_Qr');
+            input.value = 'MAT-' + Array.from(crypto.getRandomValues(new Uint8Array(12))).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('').toUpperCase();
+        });
+    </script>
+}

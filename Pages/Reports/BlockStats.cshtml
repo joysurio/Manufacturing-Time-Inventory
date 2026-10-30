@@ -1,0 +1,116 @@
+@page
+@model ManufacturingTimeTracking.Pages.Reports.BlockStatsModel
+@{
+    ViewData["Title"] = "Blockage Statistics";
+}
+
+<div class="animate-fade-in">
+    <h1 class="text-xl font-bold mb-4">Blockage Statistics</h1>
+
+    <div class="bg-white rounded-2xl shadow-soft p-4 mb-4">
+        <form method="get" class="flex gap-3 items-end flex-wrap">
+            <div>
+                <label class="block text-sm text-slate-500">From</label>
+                <input asp-for="FromDate" type="date" class="input-dark" />
+            </div>
+            <div>
+                <label class="block text-sm text-slate-500">To</label>
+                <input asp-for="ToDate" type="date" class="input-dark" />
+            </div>
+            <div>
+                <button type="submit" class="btn-outline-luminous">Apply</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft p-4 mb-4">
+        <h2 class="text-lg font-semibold text-slate-800 mb-3">Summary</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="p-4 bg-slate-50 rounded">
+                <div class="text-sm text-slate-500">Total blocks</div>
+                <div class="text-2xl font-semibold">@Model.TotalBlocks</div>
+            </div>
+            <div class="p-4 bg-slate-50 rounded">
+                <div class="text-sm text-slate-500">Average duration</div>
+                <div class="text-2xl font-semibold">@((Model.AverageDurationSeconds>0) ? TimeSpan.FromSeconds((int)Model.AverageDurationSeconds).ToString(@"hh\:mm\:ss") : "—")</div>
+            </div>
+            <div class="p-4 bg-slate-50 rounded">
+                <div class="text-sm text-slate-500">Median duration</div>
+                <div class="text-2xl font-semibold">@((Model.MedianDurationSeconds>0) ? TimeSpan.FromSeconds(Model.MedianDurationSeconds).ToString(@"hh\:mm\:ss") : "—")</div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h3 class="text-sm font-semibold">Top reasons</h3>
+            <div id="topReasons" style="height:140px"></div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft p-4 mb-6">
+        <h2 class="text-lg font-semibold text-slate-800 mb-3">Weekly blocks</h2>
+        <div class="text-sm text-slate-600 mb-2">Scanned: <strong>@Model.Scanned</strong></div>
+        <div class="kpi-chart"><canvas id="chartWeeklyBlocks"></canvas></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const weekly = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.WeeklySummary));
+    const weeklyDetails = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.WeeklyDetails));
+    const topReasons = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TopReasons));
+
+    function createBar(ctx, labels, data, color) {
+        return new Chart(ctx, {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: '', data: data, backgroundColor: color, maxBarThickness: 48 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }
+        });
+    }
+
+    function formatDur(sec){
+        if (!sec && sec !== 0) return '—';
+        var s = Number(sec);
+        if (isNaN(s)) return '—';
+        var hours = Math.floor(s/3600); var mins = Math.floor((s%3600)/60); var secs = s%60;
+        return String(hours).padStart(2,'0') + ':' + String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('chartWeeklyBlocks').getContext('2d');
+        const chart = createBar(ctx, weekly.labels || [], weekly.values || [], 'rgba(59,130,246,0.9)');
+
+        // popup
+        const popup = document.createElement('div');
+        popup.style.position = 'fixed'; popup.style.zIndex = 9999; popup.style.display = 'none'; popup.style.maxWidth = '520px'; popup.style.background = 'white'; popup.style.border = '1px solid rgba(0,0,0,0.08)'; popup.style.boxShadow = '0 6px 18px rgba(2,6,23,0.08)'; popup.style.padding = '10px'; popup.style.borderRadius = '8px'; popup.style.fontSize = '13px';
+        document.body.appendChild(popup);
+        const canvas = document.getElementById('chartWeeklyBlocks');
+        canvas.addEventListener('mousemove', function(evt){
+            const pts = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+            if (!pts || pts.length === 0) { popup.style.display = 'none'; return; }
+            const idx = pts[0].index;
+            const details = (weeklyDetails && weeklyDetails[idx]) ? weeklyDetails[idx] : [];
+            if (!details || details.length === 0) { popup.style.display = 'none'; return; }
+            let html = `<strong>Blocks (week ${weekly.labels[idx]})</strong><div style="margin-top:8px;">`;
+            details.forEach(function(d){ html += `<div style="padding:6px 0;border-bottom:1px solid #f2f2f2;"><div style="font-weight:600">${d.Label}</div><div style="color:#6b7280">Duration: ${formatDur(d.Duration)} — Reason: ${d.Reason}</div><div style="color:#374151;font-size:12px;margin-top:4px">Reported by: ${d.CreatedBy}</div></div>`; });
+            html += '</div>';
+            popup.innerHTML = html;
+            popup.style.left = (evt.clientX + 12) + 'px';
+            popup.style.top = (evt.clientY + 12) + 'px';
+            popup.style.display = 'block';
+        });
+        canvas.addEventListener('mouseleave', function(){ popup.style.display = 'none'; });
+
+        // render top reasons simple list
+        const tr = document.getElementById('topReasons');
+        if (topReasons && topReasons.labels && topReasons.labels.length) {
+            let html = '<ul class="text-sm list-disc pl-5">';
+            for (var i = 0; i < topReasons.labels.length; i++) {
+                html += `<li>${topReasons.labels[i]} — ${topReasons.values[i]}</li>`;
+            }
+            html += '</ul>';
+            tr.innerHTML = html;
+        } else {
+            tr.innerHTML = '<div class="text-sm text-slate-500">No reasons recorded.</div>';
+        }
+    });
+</script>

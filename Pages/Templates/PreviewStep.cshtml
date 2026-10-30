@@ -1,0 +1,126 @@
+@page
+@model ManufacturingTimeTracking.Pages.Templates.PreviewStepModel
+@{
+    Layout = null;
+}
+<style>
+    .step-preview-container { display: flex; min-height: 400px; overflow: hidden; }
+    .step-preview-main { flex: 1; padding: 20px; overflow-y: auto; background: white; }
+    .step-preview-sidebar { width: 25%; background: #1a1a1a; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+    .step-preview-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    .step-preview-info { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    .step-preview-evidence-item { background: #2a2a2a; padding: 10px; border-radius: 8px; color: white; margin-bottom: 10px; }
+    .step-preview-evidence-item small { color: #aaa; }
+    .step-preview .img-thumbnail { cursor: pointer; }
+    .step-preview .img-thumbnail:hover { opacity: 0.8; }
+</style>
+<div class="step-preview step-preview-container">
+    <div class="step-preview-main">
+        <div class="step-preview-header">
+            <h1 class="h4 mb-0">@Model.StepTemplate.Title</h1>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div>
+                    <span class="badge bg-light text-dark me-2">Step @Model.StepTemplate.SortOrder</span>
+                    <span class="badge bg-secondary">Preview</span>
+                </div>
+                <div class="small opacity-75">
+                    <strong>Order:</strong> — | <strong>Serial:</strong> —
+                </div>
+            </div>
+        </div>
+
+        <div class="step-preview-info">
+            <h3 class="h5">Instructions</h3>
+            <div style="font-size: 1.1rem; line-height: 1.6;">
+                @Html.Raw(ManufacturingTimeTracking.Helpers.InstructionFormatter.FormatInstructions(Model.StepTemplate.Instructions))
+            </div>
+        </div>
+
+        @if (Model.StepMedia.Any())
+        {
+            <div class="step-preview-info">
+                <h4 class="h6">Reference Documents</h4>
+                <div class="row g-2">
+                    @foreach (var stepMedia in Model.StepMedia)
+                    {
+                        <div class="col-md-3 col-6">
+                            @if (stepMedia.Media.Type == "Image")
+                            {
+                                <div class="card">
+                                    <img src="~/uploads/@stepMedia.Media.UrlOrPath" class="card-img-top img-thumbnail" style="height: 100px; object-fit: cover;" alt="@stepMedia.Caption" />
+                                    @if (!string.IsNullOrEmpty(stepMedia.Caption)) { <div class="card-body py-1"><p class="card-text small mb-0">@stepMedia.Caption</p></div> }
+                                </div>
+                            }
+                            else if (stepMedia.Media.Type == "PDF")
+                            {
+                                <div class="card">
+                                    <div class="card-body text-center py-2">
+                                        <span style="font-size: 1.5rem;">📄</span>
+                                        <p class="card-text small mb-0">PDF</p>
+                                        <a href="~/uploads/@stepMedia.Media.UrlOrPath" target="_blank" class="inline-flex px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">View</a>
+                                    </div>
+                                </div>
+                            }
+                            else if (stepMedia.Media.Type == "Video")
+                            {
+                                <div class="card">
+                                    <div class="card-body text-center py-2">
+                                        <span style="font-size: 1.5rem;">▶️</span>
+                                        <p class="card-text small mb-0">Video</p>
+                                        <a href="~/uploads/@stepMedia.Media.UrlOrPath" target="_blank" class="inline-flex px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">View</a>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="mt-3">
+            <button type="button" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700" disabled>Start Step</button>
+            <small class="text-muted ms-2">(Preview only)</small>
+        </div>
+    </div>
+
+    <div class="step-preview-sidebar">
+        @if (Model.StepTools.Any() || Model.StepMaterials.Any())
+        {
+            <div style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                @if (Model.StepTools.Any())
+                {
+                    <h5 style="color: white; margin-bottom: 10px;">🔧 Required Tools</h5>
+                    <ul style="color: #ddd; margin-bottom: 15px; padding-left: 20px;">
+                        @foreach (var tool in Model.StepTools)
+                        {
+                            <li style="margin-bottom: 5px;">@tool.Tool.Name</li>
+                        }
+                    </ul>
+                }
+                @if (Model.StepMaterials.Any())
+                {
+                    <h5 style="color: white; margin-bottom: 10px;">🔩 Fasteners / Materials</h5>
+                    <ul style="color: #ddd; margin-bottom: 0; padding-left: 20px;">
+                        @foreach (var material in Model.StepMaterials)
+                        {
+                            <li style="margin-bottom: 5px;">
+                                @ManufacturingTimeTracking.Models.Execution.StepExecMaterial.FormatMaterialLineForOperator(material.Material.Name, material.Qty, material.Material?.Unit)
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        <h4 style="color: white; margin-bottom: 10px;">📚 Reference Materials</h4>
+        <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 15px;">
+            Videos and images from other users working on this step
+        </p>
+        <div class="step-preview-evidence-item">
+            <p style="color: #aaa; text-align: center; margin: 0;">No reference materials yet.<br/>Be the first to add one!</p>
+        </div>
+        <div style="margin-top: auto; padding-top: 15px;">
+            <button type="button" onclick="typeof closePreviewModal === 'function' && closePreviewModal()" class="inline-block w-full text-center px-4 py-2 rounded-lg border border-slate-500 text-slate-200 hover:bg-slate-700" aria-label="Close">← Close Preview</button>
+        </div>
+    </div>
+</div>

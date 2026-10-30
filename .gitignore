@@ -1,0 +1,29 @@
+# Build output
+bin/
+obj/
+publish/
+
+# CI checkout of Test-WWKS-PROTOCOL (see .github/workflows/publish.yml)
+lib/Test-WWKS/
+
+# IDE / user-specific
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
+
+# Data protection keys (machine-specific)
+DataProtection-Keys/
+
+# Runtime uploads (generated at runtime)
+wwwroot/uploads/**
+!wwwroot/uploads/**/
+!wwwroot/uploads/**/.gitkeep
+
+# Local configuration (use appsettings.Production.json as template)
+appsettings.Development.json
+appsettings.json

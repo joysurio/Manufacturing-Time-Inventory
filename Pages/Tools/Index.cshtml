@@ -1,0 +1,57 @@
+@page
+@model ManufacturingTimeTracking.Pages.Tools.IndexModel
+@{
+    ViewData["Title"] = "Tools";
+}
+
+<style>
+    .page-light { background: #f8fafc; color: #0f172a; font-weight: 300; }
+    .card-light {
+        background: #ffffff;
+        border: 1px solid rgba(59,130,246,0.3);
+        box-shadow: 0 0 18px rgba(59,130,246,0.18), 0 0 36px rgba(59,130,246,0.12);
+        border-radius: 18px;
+    }
+    .btn-glow {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.45), 0 0 28px rgba(59,130,246,0.25);
+        background: linear-gradient(135deg, #0ea5e9, #2563eb);
+        color: #f8fafc;
+    }
+    .table-light thead { background: #e2e8f0; }
+    .table-light th { color: #0f172a; }
+    .table-light td { color: #0f172a; }
+    .table-light tr:hover { background: #f1f5f9; }
+</style>
+
+<div class="animate-fade-in page-light">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-bold text-slate-800">Tools</h1>
+        <a asp-page="Create" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl btn-glow font-medium hover:brightness-110 transition-all duration-200 w-fit">Create New Tool</a>
+    </div>
+    <div class="card-light overflow-hidden max-w-4xl mx-auto">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 table-fixed w-full table-light">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-4 text-center w-9/12 text-xs font-semibold uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-4 text-center w-3/12 text-xs font-semibold uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var tool in Model.Tools)
+                    {
+                        <tr class="table-row-hover transition-colors duration-150">
+                            <td class="px-6 py-4 w-9/12 text-center font-medium text-slate-800">@tool.Name</td>
+                            <td class="px-6 py-4 w-3/12 text-center items-center justify-center gap-2 flex-wrap">
+                                <a asp-page="./Edit" asp-route-id="@tool.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg btn-glow text-sm font-medium hover:brightness-110">Edit</a>
+                                <a asp-page="./Delete" asp-route-id="@tool.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50">Delete</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="_Pagination" model="Model.Pagination" />
+    </div>
+</div>

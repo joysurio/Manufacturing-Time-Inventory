@@ -1,0 +1,403 @@
+@page
+@model ManufacturingTimeTracking.Pages.TimeTracking.IndexModel
+@{
+    ViewData["Title"] = "Time Tracking";
+    var isClockedIn = Model.Status == "Working" || Model.Status == "On Break";
+    var canStartBreak = Model.Status == "Working";
+    var canEndBreak = Model.Status == "On Break";
+    var canClockOut = Model.Status == "Working";
+    var blockHtml = TempData["TimeTrackingBlock"] as string;
+    var lateHtml = TempData["TimeTrackingWarningLate"] as string;
+    var longBreakHtml = TempData["TimeTrackingWarningLongBreak"] as string;
+    var endOfDayHtml = TempData["EndOfDaySummaryHtml"] as string;
+}
+@functions {
+    static string FormatDuration(TimeSpan t)
+    {
+        if (t.TotalHours >= 1)
+            return $"{(int)t.TotalHours}h {t.Minutes}m";
+        if (t.TotalMinutes >= 1)
+            return $"{t.Minutes}m {t.Seconds}s";
+        return $"{t.Seconds}s";
+    }
+}
+<style>
+    .tt-surface {
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.08), transparent 35%),
+                    radial-gradient(circle at 80% 0%, rgba(244,114,182,0.08), transparent 30%),
+                    #0a0f1f;
+        color: #f8fafc;
+        font-weight: 300;
+        border: 1px solid rgba(56,189,248,0.45);
+        box-shadow: 0 0 30px rgba(56,189,248,0.25), 0 0 60px rgba(56,189,248,0.12);
+    }
+    .tt-panel {
+        background: rgba(15,23,42,0.92);
+        border: 1px solid rgba(125,211,252,0.35);
+        box-shadow: 0 0 22px rgba(125,211,252,0.2);
+    }
+    .tt-heading { color: #fff; font-weight: 600; letter-spacing: 0.01em; }
+    .tt-subtext { color: #e2e8f0; }
+    .tt-label { color: #cbd5e1; font-weight: 500; letter-spacing: 0.04em; }
+    .clock-neon {
+        position: relative;
+        width: 104px;
+        height: 104px;
+        border-radius: 9999px;
+        background: radial-gradient(circle at 30% 30%, rgba(57,255,20,0.12), #050915 55%, #020617);
+        border: 3px solid rgba(57,255,20,0.85);
+        box-shadow:
+            0 0 8px rgba(57,255,20,0.95),
+            0 0 24px rgba(57,255,20,0.65),
+            0 0 48px rgba(57,255,20,0.35),
+            inset 0 0 20px rgba(0,0,0,0.45);
+        color: #c0ffc0;
+        font-family: 'Share Tech Mono', 'Consolas', monospace;
+    }
+    .clock-neon .clock-face { position: absolute; inset: 12px; border-radius: 9999px; border: 1px dashed rgba(57,255,20,0.4); }
+    .clock-neon .clock-number { position: absolute; font-size: 12px; font-weight: 700; color: #f8fafc; text-shadow: 0 0 8px rgba(57,255,20,0.55), 0 0 2px rgba(0,0,0,0.8); }
+    .number-12 { top: -1px; left: 50%; transform: translateX(-50%); }
+    .number-3 { right: 1px; top: 50%; transform: translateY(-50%); }
+    .number-6 { bottom: -1px; left: 50%; transform: translateX(-50%); }
+    .number-9 { left: 1px; top: 50%; transform: translateY(-50%); }
+    .clock-hand { position: absolute; left: 50%; top: 50%; transform-origin: bottom center; }
+    .hand-hour { width: 3px; height: 26px; background: #e2ffe0; box-shadow: 0 0 10px rgba(57,255,20,0.85); border-radius: 9999px; }
+    .hand-minute { width: 2px; height: 34px; background: #86ff6a; box-shadow: 0 0 12px rgba(57,255,20,0.8); border-radius: 9999px; }
+    .hand-second { width: 1px; height: 38px; background: #bef264; box-shadow: 0 0 8px rgba(190,242,100,0.9); }
+    .clock-center-dot { position: absolute; width: 7px; height: 7px; border-radius: 9999px; background: #facc15; left: 50%; top: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(250,204,21,0.85); z-index: 2; }
+    .clock-digital { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #39ff14; text-shadow: 0 0 10px rgba(57,255,20,0.9), 0 0 20px rgba(57,255,20,0.45); white-space: nowrap; }
+
+    .page-dark {
+        background: #050915;
+        color: #f8fafc;
+        font-weight: 300;
+    }
+    .btn-glow-blue {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+    }
+
+    /* End-of-day modal styles */
+    .eod-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 60; }
+    .eod-backdrop { position: absolute; inset: 0; background: rgba(2,6,23,0.7); }
+    .eod-content { position: relative; z-index: 61; width: 95%; max-width: 720px; max-height: 90vh; overflow:auto; border-radius:16px; }
+
+    /* Late-warning modal styles */
+    .late-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 70; }
+    .late-backdrop { position: absolute; inset: 0; background: rgba(23,23,23,0.8); }
+    .late-content { position: relative; z-index: 71; width: 90%; max-width: 600px; max-height: 80vh; overflow:auto; border-radius:16px; }
+</style>
+<div class="animate-fade-in max-w-3xl mx-auto page-dark p-4">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <a asp-page="./Report" class="inline-flex items-center px-4 py-2 rounded-xl border border-blue-300/70 text-white font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_14px_rgba(59,130,246,0.6)] transition-all duration-200 btn-glow-blue">Time report</a>
+        <a asp-page="./DetailedReport" class="inline-flex items-center px-4 py-2 rounded-xl border border-blue-300/70 text-white font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_14px_rgba(59,130,246,0.6)] transition-all duration-200 btn-glow-blue">Detailed report</a>
+        @if (User.IsInRole("Admin") || User.IsInRole("Supervisor"))
+        {
+            <a asp-page="./DailyReport" class="inline-flex items-center px-4 py-2 rounded-xl border border-blue-300/70 text-white font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_14px_rgba(59,130,246,0.6)] transition-all duration-200 btn-glow-blue">Daily report</a>
+        }
+        else
+        {
+            <button type="button" onclick="showDailyReportInfo()" class="inline-flex items-center px-4 py-2 rounded-xl border border-blue-300/40 text-slate-400 font-medium bg-slate-800/60 shadow-[0_0_8px_rgba(59,130,246,0.12)] transition-all duration-200 opacity-60">Daily report</button>
+            <div class="text-sm text-yellow-300 mt-2">Nota: Este menú solo está accesible para administradores o supervisores.</div>
+        }
+        @if (User.IsInRole("Admin"))
+        {
+            <a asp-page="./EditRecords" class="inline-flex items-center px-4 py-2 rounded-xl border border-blue-300/70 text-white font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_14px_rgba(59,130,246,0.6)] transition-all duration-200 btn-glow-blue">Edit records (admin)</a>
+            <a asp-page="./BreakReasons/Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-blue-300/70 text-white font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_14px_rgba(59,130,246,0.6)] transition-all duration-200 btn-glow-blue">Manage break reasons</a>
+        }
+    </div>
+
+        <!-- Daily report access modal -->
+        <div id="dailyReportAccessModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+            <div class="absolute inset-0 bg-black/60" onclick="hideDailyReportInfo()"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 z-50">
+                <div class="flex items-start justify-between">
+                    <h2 class="text-lg font-semibold text-slate-800">Acceso restringido</h2>
+                    <button type="button" onclick="hideDailyReportInfo()" class="p-2 rounded text-slate-500 hover:bg-slate-100">&times;</button>
+                </div>
+                <div class="mt-4 text-slate-700">
+                    <p>El informe diario muestra fichajes detallados por usuario y está restringido a usuarios con roles <strong>Administrador</strong> o <strong>Supervisor</strong>.</p>
+                    <p class="mt-3">Si crees que necesitas acceso, contacta con tu administrador indicando el motivo (p. ej. supervisión de turnos, auditoría de tiempos).</p>
+                </div>
+                <div class="mt-6 text-right">
+                    <button type="button" onclick="hideDailyReportInfo()" class="px-4 py-2 rounded bg-blue-600 text-white">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function showDailyReportInfo() {
+                var m = document.getElementById('dailyReportAccessModal');
+                if (!m) return; m.classList.remove('hidden'); m.classList.add('flex'); document.body.style.overflow = 'hidden';
+            }
+            function hideDailyReportInfo() {
+                var m = document.getElementById('dailyReportAccessModal');
+                if (!m) return; m.classList.add('hidden'); m.classList.remove('flex'); document.body.style.overflow = '';
+            }
+        </script>
+    <div class="tt-surface rounded-3xl p-6 mb-6">
+        <div class="flex items-center gap-4 mb-1">
+            <h1 class="text-2xl tt-heading">Time Tracking</h1>
+            <div class="clock-neon ml-8" id="neonClock">
+                <div class="clock-face"></div>
+                <div class="clock-number number-12">12</div>
+                <div class="clock-number number-3">3</div>
+                <div class="clock-number number-6">6</div>
+                <div class="clock-number number-9">9</div>
+                <div class="clock-hand hand-hour" id="handHour"></div>
+                <div class="clock-hand hand-minute" id="handMinute"></div>
+                <div class="clock-hand hand-second" id="handSecond"></div>
+                <div class="clock-center-dot"></div>
+                <div class="clock-digital" id="clockDigital">--:--:--</div>
+            </div>
+        </div>
+        <p class="tt-subtext text-sm mb-6">Record your working time. Clock in and out, and log breaks with a reason.</p>
+
+        <div class="flex flex-wrap items-center gap-6 mb-6 tt-panel rounded-2xl p-4">
+            <div>
+                <span class="text-xs font-medium tt-label uppercase tracking-wider inline-flex items-center gap-1">User <span class="text-yellow-400 text-xl leading-none">👤</span></span>
+                <p class="font-semibold text-white">@Model.UserDisplayName</p>
+            </div>
+            <div>
+                <span class="text-xs font-medium tt-label uppercase tracking-wider">Date</span>
+                <p class="font-semibold text-white">@Model.DateToday.ToString("yyyy-MM-dd")</p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(blockHtml))
+        {
+            <div class="mb-6">@Html.Raw(blockHtml)</div>
+        }
+
+        @if (TempData["TimeTrackingSuccess"] != null)
+        {
+            <div class="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-400/50 text-emerald-200 text-sm">@TempData["TimeTrackingSuccess"]</div>
+        }
+        @* Late-warning shown as mandatory modal (user must accept) *@
+        @if (TempData["TimeTrackingError"] != null)
+        {
+            <div class="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-400/50 text-red-200 text-sm">@TempData["TimeTrackingError"]</div>
+        }
+
+        <div class="grid grid-cols-2 gap-3 mb-6">
+            <form method="post" asp-page-handler="ClockIn" class="@((Model.Status == "Not Clocked In" && string.IsNullOrEmpty(blockHtml)) ? "" : "opacity-60 pointer-events-none")">
+                <button type="submit" class="w-full px-5 py-4 rounded-xl bg-lime-500 border border-lime-200/70 text-white font-semibold hover:bg-lime-500 hover:border-lime-100 shadow-[0_0_18px_rgba(132,204,22,0.8),0_0_30px_rgba(132,204,22,0.45)] transition-all duration-200 disabled:opacity-50" @(Model.Status != "Not Clocked In" || !string.IsNullOrEmpty(blockHtml) ? "disabled" : "")>Clock In</button>
+            </form>
+            <form method="post" asp-page-handler="StartBreak" id="formStartBreak" class="@(canStartBreak ? "" : "opacity-60 pointer-events-none")">
+                <input type="hidden" name="breakReasonId" id="hiddenBreakReasonId" value="" />
+                <button type="button" id="btnStartBreak" class="w-full px-5 py-4 rounded-xl bg-amber-500 border border-amber-300/70 text-white font-semibold hover:bg-amber-500 hover:border-amber-200 shadow-[0_0_18px_rgba(245,158,11,0.75),0_0_30px_rgba(245,158,11,0.45)] transition-all duration-200 disabled:opacity-50" @(canStartBreak ? "" : "disabled")>Start Break</button>
+            </form>
+            <form method="post" asp-page-handler="EndBreak" class="@(canEndBreak ? "" : "opacity-60 pointer-events-none")">
+                <button type="submit" class="w-full px-5 py-4 rounded-xl bg-sky-500 border border-sky-200/70 text-white font-semibold hover:bg-sky-500 hover:border-sky-100 shadow-[0_0_18px_rgba(14,165,233,0.8),0_0_30px_rgba(14,165,233,0.45)] transition-all duration-200 disabled:opacity-50" @(canEndBreak ? "" : "disabled")>End Break</button>
+            </form>
+            <form method="post" asp-page-handler="ClockOut" class="@(canClockOut ? "" : "opacity-60 pointer-events-none")">
+                <button type="submit" class="w-full px-5 py-4 rounded-xl bg-red-600 border border-red-200/70 text-white font-semibold hover:bg-red-600 hover:border-red-100 shadow-[0_0_18px_rgba(220,38,38,0.8),0_0_30px_rgba(220,38,38,0.45)] transition-all duration-200 disabled:opacity-50" @(canClockOut ? "" : "disabled")>Clock Out</button>
+            </form>
+        </div>
+
+        <div class="border-t border-slate-700 pt-4">
+            <p class="text-sm font-medium text-slate-200 mb-1">Current status</p>
+            <p class="text-lg font-semibold @(Model.Status == "Working" ? "text-emerald-300" : Model.Status == "On Break" ? "text-amber-300" : "text-slate-200")">@Model.Status</p>
+            @if (Model.SessionStartedAtUtc.HasValue && Model.Status != "Not Clocked In")
+            {
+                <p class="text-sm text-slate-200 mt-2">Session started: @Model.SessionStartedAtUtc.Value.ToLocalTime().ToString("HH:mm")</p>
+            }
+            @if (Model.SessionDuration.HasValue)
+            {
+                <p class="text-sm text-slate-200">Session duration: @FormatDuration(Model.SessionDuration.Value)</p>
+            }
+            @if (Model.BreakStartedAtUtc.HasValue)
+            {
+                <p class="text-sm text-amber-300 mt-1">Break started: @Model.BreakStartedAtUtc.Value.ToLocalTime().ToString("HH:mm")</p>
+            }
+            @if (Model.BreakDuration.HasValue)
+            {
+                <p class="text-sm text-amber-300">Break duration: @FormatDuration(Model.BreakDuration.Value)</p>
+            }
+        </div>
+
+        <div class="border-t border-slate-700 pt-4 mt-4">
+            <p class="text-sm font-medium text-slate-200 mb-1">Today's summary</p>
+            <p class="text-slate-100">Worked: <strong>@FormatDuration(Model.TodayWorked)</strong></p>
+            <p class="text-slate-100">Break time: <strong>@FormatDuration(Model.TodayBreak)</strong></p>
+        </div>
+    </div>
+</div>
+
+<!-- End-of-day modal -->
+@if (!string.IsNullOrEmpty(endOfDayHtml))
+{
+    <div class="eod-modal" id="endOfDayModal" aria-hidden="true">
+        <div class="eod-backdrop" id="endOfDayBackdrop"></div>
+        <div class="eod-content bg-white p-4" role="dialog" aria-modal="true" aria-labelledby="eodTitle">
+            <div class="flex items-start justify-between">
+                <h2 id="eodTitle" class="text-lg font-semibold text-slate-800">Resumen del día</h2>
+                <button type="button" id="endOfDayClose" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100">&times;</button>
+            </div>
+            <div class="mt-3 text-slate-800">
+                @Html.Raw(endOfDayHtml)
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Late-warning modal -->
+@if (!string.IsNullOrEmpty(lateHtml))
+{
+    <div class="tw-modal fixed inset-0 z-[90]" id="lateModal" role="dialog" aria-modal="true" aria-labelledby="lateTitle">
+        <div class="fixed inset-0 bg-black/60"></div>
+        <div class="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded-lg shadow-lg max-w-lg w-full">
+            <h2 id="lateTitle" class="text-lg font-semibold text-slate-800">Late Clock-In Warning</h2>
+            <div class="mt-3 text-slate-800">
+                @Html.Raw(lateHtml)
+            </div>
+            <form method="post" asp-page-handler="AcknowledgeLate" class="mt-4">
+                <button type="submit" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg">Acknowledge</button>
+            </form>
+        </div>
+    </div>
+}
+
+<!-- Long-break warning modal -->
+@if (!string.IsNullOrEmpty(longBreakHtml))
+{
+    <div class="tw-modal fixed inset-0 z-[92]" id="longBreakModal" role="dialog" aria-modal="true" aria-labelledby="longBreakTitle">
+        <div class="fixed inset-0 bg-black/60"></div>
+        <div class="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded-lg shadow-lg max-w-lg w-full">
+            <h2 id="longBreakTitle" class="text-lg font-semibold text-slate-800">Descanso prolongado</h2>
+            <div class="mt-3 text-slate-800">
+                @Html.Raw(longBreakHtml)
+            </div>
+            <form method="post" asp-page-handler="AcknowledgeLongBreak" class="mt-4">
+                <button type="submit" class="w-full px-4 py-2 bg-amber-600 text-white rounded-lg">Aceptar</button>
+            </form>
+        </div>
+    </div>
+}
+
+<!-- Break reason modal -->
+<div id="breakReasonModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-hidden="true">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-slate-900/60" aria-hidden="true" id="breakModalBackdrop"></div>
+        <div class="relative bg-slate-900 rounded-2xl shadow-xl border border-cyan-400/50 p-6 w-full max-w-sm text-white">
+            <h3 class="text-lg font-semibold mb-3">Select break reason</h3>
+            <select id="breakReasonSelect" class="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40 mb-4">
+                <option value="">— Select reason —</option>
+                @foreach (var r in Model.BreakReasons)
+                {
+                    <option value="@r.Id">@r.Name</option>
+                }
+            </select>
+            <div class="flex gap-2 justify-end">
+                <button type="button" id="breakModalCancel" class="px-4 py-2 rounded-xl border border-blue-300/60 text-slate-200 font-medium hover:bg-slate-800 btn-glow-blue">Cancel</button>
+                <button type="button" id="breakModalConfirm" class="px-4 py-2 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.55)] border border-amber-200/70">Start break</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Clock
+            function pad(v) { return v.toString().padStart(2, '0'); }
+            function updateClock() {
+                var now = new Date();
+                var h = now.getHours();
+                var m = now.getMinutes();
+                var s = now.getSeconds();
+                var hourDeg = (h % 12 + m / 60) * 30;
+                var minDeg = (m + s / 60) * 6;
+                var secDeg = s * 6;
+                var hh = document.getElementById('handHour');
+                var hm = document.getElementById('handMinute');
+                var hs = document.getElementById('handSecond');
+                var cd = document.getElementById('clockDigital');
+                if (hh) hh.style.transform = 'translate(-50%, -100%) rotate(' + hourDeg + 'deg)';
+                if (hm) hm.style.transform = 'translate(-50%, -100%) rotate(' + minDeg + 'deg)';
+                if (hs) hs.style.transform = 'translate(-50%, -100%) rotate(' + secDeg + 'deg)';
+                if (cd) cd.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            // Break modal elements
+            var btnStartBreak = document.getElementById('btnStartBreak');
+            var formStartBreak = document.getElementById('formStartBreak');
+            var hiddenBreakReasonId = document.getElementById('hiddenBreakReasonId');
+            var breakModal = document.getElementById('breakReasonModal');
+            var breakBackdrop = document.getElementById('breakModalBackdrop');
+            var breakCancel = document.getElementById('breakModalCancel');
+            var breakConfirm = document.getElementById('breakModalConfirm');
+            var breakSelect = document.getElementById('breakReasonSelect');
+
+            function openBreakModal() {
+                if (!btnStartBreak || btnStartBreak.disabled) return;
+                if (breakSelect) breakSelect.value = '';
+                if (breakModal) {
+                    breakModal.classList.remove('hidden');
+                    breakModal.setAttribute('aria-hidden','false');
+                }
+                document.body.style.overflow = 'hidden';
+            }
+            function closeBreakModal() {
+                if (breakModal) {
+                    breakModal.classList.add('hidden');
+                    breakModal.setAttribute('aria-hidden','true');
+                }
+                document.body.style.overflow = '';
+            }
+
+            if (btnStartBreak) btnStartBreak.addEventListener('click', function(e){ e.preventDefault(); openBreakModal(); });
+            if (breakCancel) breakCancel.addEventListener('click', function(){ closeBreakModal(); });
+            if (breakBackdrop) breakBackdrop.addEventListener('click', function(){ closeBreakModal(); });
+            if (breakConfirm) {
+                breakConfirm.addEventListener('click', function(e){
+                    e.preventDefault();
+                    if (!breakSelect || !hiddenBreakReasonId || !formStartBreak) return;
+                    var val = breakSelect.value;
+                    if (!val || val === '') { alert('Please select a break reason.'); return; }
+                    hiddenBreakReasonId.value = val;
+                    closeBreakModal();
+                    formStartBreak.submit();
+                });
+            }
+
+            // Late clock-in modal handling
+            var hasLate = @((!string.IsNullOrEmpty(lateHtml)).ToString().ToLower());
+            if (hasLate) {
+                var lateModal = document.getElementById('lateModal');
+                if (lateModal) {
+                    lateModal.style.display = 'block';
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+
+            // End-of-day modal handling
+            var hasEod = @((!string.IsNullOrEmpty(endOfDayHtml)).ToString().ToLower());
+            if (hasEod) {
+                var eodModal = document.getElementById('endOfDayModal');
+                var eodBackdrop = document.getElementById('endOfDayBackdrop');
+                var eodClose = document.getElementById('endOfDayClose');
+                if (eodModal) {
+                    eodModal.style.display = 'flex';
+                    eodModal.setAttribute('aria-hidden', 'false');
+                    document.body.style.overflow = 'hidden';
+                }
+                function closeEod() {
+                    if (eodModal) { eodModal.style.display = 'none'; eodModal.setAttribute('aria-hidden','true'); }
+                    document.body.style.overflow = '';
+                }
+                if (eodClose) eodClose.addEventListener('click', closeEod);
+                if (eodBackdrop) eodBackdrop.addEventListener('click', closeEod);
+            }
+
+            // Long-break modal handling
+            var hasLongBreak = @((!string.IsNullOrEmpty(longBreakHtml)).ToString().ToLower());
+            if (hasLongBreak) {
+                var lb = document.getElementById('longBreakModal');
+                if (lb) { lb.style.display = 'block'; document.body.style.overflow = 'hidden'; }
+            }
+        });
+    </script>
+}

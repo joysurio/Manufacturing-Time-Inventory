@@ -1,0 +1,68 @@
+@page
+@model ManufacturingTimeTracking.Pages.Admin.Users.CreateModel
+@{
+    ViewData["Title"] = "Create User";
+}
+
+<div class="animate-fade-in w-full">
+    <div class="mb-6">
+        <a asp-page="./Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">← Back to Users</a>
+    </div>
+
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Create User</h1>
+    <p class="text-slate-600 mb-6">Only administrators can create new user accounts. The new user will be able to sign in with the email and password you set.</p>
+
+    <form method="post" class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 max-w-2xl mx-auto">
+        <!-- <div asp-validation-summary="All" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm mb-4"></div> -->
+
+        <div class="mb-5">
+            <label asp-for="Input.FirstName" class="block text-sm font-medium text-slate-700 mb-1.5">First name</label>
+            <input asp-for="Input.FirstName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+        </div>
+        <div class="mb-5">
+            <label asp-for="Input.LastName" class="block text-sm font-medium text-slate-700 mb-1.5">Last name</label>
+            <input asp-for="Input.LastName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+        </div>
+        <div class="mb-5">
+            <label asp-for="Input.Dni" class="block text-sm font-medium text-slate-700 mb-1.5">DNI</label>
+            <input asp-for="Input.Dni" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+        </div>
+        <div class="mb-5">
+            <label asp-for="Input.Email" class="block text-sm font-medium text-slate-700 mb-1.5">Email <span class="text-red-500">*</span></label>
+            <input asp-for="Input.Email" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" type="email" autocomplete="username" />
+            <span asp-validation-for="Input.Email" class="text-red-600 text-sm mt-1 block"></span>
+        </div>
+
+        <div class="mb-5">
+            <label asp-for="Input.UserName" class="block text-sm font-medium text-slate-700 mb-1.5">User name (optional)</label>
+            <input asp-for="Input.UserName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" autocomplete="username" />
+            <span class="text-slate-500 text-sm">Leave blank to use email as user name.</span>
+            <span asp-validation-for="Input.UserName" class="text-red-600 text-sm mt-1 block"></span>
+        </div>
+
+        <div class="mb-5">
+            <label asp-for="Input.Password" class="block text-sm font-medium text-slate-700 mb-1.5">Password <span class="text-red-500">*</span></label>
+            <input asp-for="Input.Password" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" autocomplete="new-password" />
+            <span asp-validation-for="Input.Password" class="text-red-600 text-sm mt-1 block"></span>
+        </div>
+
+        <div class="mb-5">
+            <label asp-for="Input.ConfirmPassword" class="block text-sm font-medium text-slate-700 mb-1.5">Confirm password <span class="text-red-500">*</span></label>
+            <input asp-for="Input.ConfirmPassword" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" autocomplete="new-password" />
+            <span asp-validation-for="Input.ConfirmPassword" class="text-red-600 text-sm mt-1 block"></span>
+        </div>
+
+        <div class="mb-6">
+            <label asp-for="Input.Role" class="block text-sm font-medium text-slate-700 mb-1.5">Role <span class="text-red-500">*</span></label>
+            <select asp-for="Input.Role" asp-items="Model.RoleList" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                <option value="">Select role</option>
+            </select>
+            <span asp-validation-for="Input.Role" class="text-red-600 text-sm mt-1 block"></span>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-all duration-200">Create User</button>
+            <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">Cancel</a>
+        </div>
+    </form>
+</div>

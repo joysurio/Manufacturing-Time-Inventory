@@ -1,0 +1,46 @@
+@page "{id:int}"
+@model ManufacturingTimeTracking.Pages.Materials.PrintQrModel
+@{
+    ViewData["Title"] = "Print QR - " + (Model.Material?.Name ?? "Material");
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @@media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-white p-8">
+    @if (Model.Material != null)
+    {
+        <div class="max-w-md mx-auto text-center">
+            <h1 class="text-xl font-bold text-slate-800 mb-2">@Model.Material.Name</h1>
+            @if (!string.IsNullOrEmpty(Model.Material.Qr))
+            {
+                <p class="text-sm text-slate-600 mb-4">@Model.Material.Qr</p>
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=@Uri.EscapeDataString(Model.Material.Qr)" alt="QR Code" class="mx-auto border border-slate-200 rounded-lg" />
+            }
+            else
+            {
+                <p class="text-slate-500">No QR code set for this material.</p>
+            }
+        </div>
+        <div class="mt-8 text-center no-print">
+            <button type="button" onclick="window.print();" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Print</button>
+            <button type="button" onclick="window.close();" class="ml-2 px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Close</button>
+        </div>
+    }
+    else
+    {
+        <p class="text-slate-600">Material not found.</p>
+    }
+</body>
+</html>

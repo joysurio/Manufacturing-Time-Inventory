@@ -1,0 +1,19 @@
+@page
+@model ManufacturingTimeTracking.Pages.Reports.BackfillStepTargetsModel
+@{
+    ViewData["Title"] = "Backfill Step Targets";
+}
+
+<div class="animate-fade-in">
+    <h1 class="text-xl font-bold mb-4">Backfill Step Target Seconds</h1>
+    <div class="bg-white rounded-2xl shadow-soft p-4 mb-4">
+        <p class="text-slate-700">This operation will copy current template target seconds into existing step executions that don't have a target recorded. Use this to analyse past performance based on current template targets.</p>
+        <form method="post" class="mt-4">
+            <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white">Run Backfill</button>
+        </form>
+        @if (!string.IsNullOrEmpty(Model.Message))
+        {
+            <div class="mt-3 p-3 bg-slate-50 rounded">@Model.Message</div>
+        }
+    </div>
+</div>

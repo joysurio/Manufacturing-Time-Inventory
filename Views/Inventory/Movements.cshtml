@@ -1,0 +1,535 @@
+@model ManufacturingTimeTracking.Controllers.MovementsViewModel
+@{
+    ViewData["Title"] = "Movements";
+    var dateFrom = ViewBag.DateFrom as DateTime?;
+    var dateTo = ViewBag.DateTo as DateTime?;
+    var user = ViewBag.User as string ?? "";
+    var notes = ViewBag.Notes as string ?? "";
+    var matType = ViewBag.MatType as string ?? "";
+    var matMaterial = ViewBag.MatMaterial as string ?? "";
+    var matLocation = ViewBag.MatLocation as string ?? "";
+    var matDestination = ViewBag.MatDestination as string ?? "";
+    var itType = ViewBag.ItType as string ?? "";
+    var itSku = ViewBag.ItSku as string ?? "";
+    var itItem = ViewBag.ItItem as string ?? "";
+    var itFromLocation = ViewBag.ItFromLocation as string ?? "";
+    var itToLocation = ViewBag.ItToLocation as string ?? "";
+    var pagination = ViewBag.Pagination as ManufacturingTimeTracking.Models.PaginationInfo;
+
+    // Render timestamps in the expected production/local timezone.
+    // Use Europe/Madrid (Linux/macOS id) and Romance Standard Time (Windows id) as fallback.
+    TimeZoneInfo displayTz;
+    try
+    {
+        displayTz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Madrid");
+    }
+    catch
+    {
+        try { displayTz = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"); }
+        catch { displayTz = TimeZoneInfo.FindSystemTimeZoneById("W. Europe Standard Time"); }
+    }
+}
+<style>
+    .time-report-surface {
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.08), transparent 35%),
+                    radial-gradient(circle at 80% 0%, rgba(244,114,182,0.08), transparent 30%),
+                    #0a0f1f;
+        color: #f8fafc;
+        font-weight: 300;
+        border: 1px solid rgba(56,189,248,0.45);
+        box-shadow: 0 0 30px rgba(56,189,248,0.25), 0 0 60px rgba(56,189,248,0.12);
+    }
+    .time-report-panel {
+        background: rgba(15,23,42,0.9);
+        border: 1px solid rgba(125,211,252,0.35);
+        box-shadow: 0 0 22px rgba(125,211,252,0.2);
+    }
+    .time-report-heading {
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+    .time-report-text { color: #e2e8f0; }
+    .table-scroll { max-height: 70vh; overflow-y: auto; overflow-x: auto; }
+    .table-report th { color: #e2e8f0 !important; }
+    .movements-header {
+        background: rgba(4,10,24,0.98);
+        box-shadow: 0 0 22px rgba(56,189,248,0.4), 0 0 40px rgba(56,189,248,0.25) inset;
+    }
+    .movements-header th,
+    .movements-header th span,
+    .movements-header .movements-filter-btn {
+        color: #7dd3fc !important;
+        text-shadow: 0 0 12px rgba(56,189,248,0.6);
+        background: transparent !important;
+    }
+    .btn-outline-luminous {
+        background: rgba(2,6,23,0.6);
+        color: #ffffff;
+        border: 1px solid rgba(59,130,246,0.55);
+        box-shadow: 0 8px 32px rgba(59,130,246,0.12), 0 0 18px rgba(59,130,246,0.12) inset;
+        transition: box-shadow .18s ease, border-color .12s ease, transform .08s ease;
+        font-weight: 600;
+        padding-left: 1.25rem; padding-right: 1.25rem;
+    }
+    .btn-outline-luminous:hover {
+        border-color: rgba(59,130,246,0.9);
+        box-shadow: 0 10px 40px rgba(59,130,246,0.26), 0 0 36px rgba(59,130,246,0.18) inset;
+        transform: translateY(-2px);
+    }
+    .delete-btn {
+        border: 1px solid rgba(248,113,113,0.8);
+        color: #fecaca;
+        background: rgba(15,23,42,0.65);
+    }
+    .delete-btn:hover { background: rgba(127,29,29,0.45); }
+</style>
+
+<div class="animate-fade-in">
+    <div class="time-report-surface rounded-3xl p-6">
+    <h1 class="text-2xl time-report-heading mb-4">Movements (ledger)</h1>
+    <p class="time-report-text mb-6">Item movements (putaway, pick, transfer) and material entries/exits (receptions, manual stock adjustments). Click the <span class="inline-flex align-middle text-slate-300">🔍</span> icon in a column header to filter.</p>
+
+    @if (dateFrom.HasValue || dateTo.HasValue || !string.IsNullOrEmpty(user) || !string.IsNullOrEmpty(notes) || !string.IsNullOrEmpty(matType) || !string.IsNullOrEmpty(matMaterial) || !string.IsNullOrEmpty(matLocation) || !string.IsNullOrEmpty(matDestination) || !string.IsNullOrEmpty(itType) || !string.IsNullOrEmpty(itSku) || !string.IsNullOrEmpty(itItem) || !string.IsNullOrEmpty(itFromLocation) || !string.IsNullOrEmpty(itToLocation))
+    {
+        <p class="mb-4"><a href="@Url.Action("Movements")" class="text-sm text-blue-200 hover:underline">Clear all filters</a></p>
+    }
+
+    <h2 class="text-lg time-report-heading mb-3">Material entries and exits</h2>
+    <div class="time-report-panel rounded-2xl overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-700 table-fixed w-full text-xs table-report">
+                <thead class="movements-header">
+                    <tr>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Date</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="date" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-date" data-params="dateFrom,dateTo">
+                                <div class="space-y-2">
+                                    <input type="date" data-param="dateFrom" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                    <input type="date" data-param="dateTo" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                </div>
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Type</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="matType" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[160px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-matType" data-params="matType">
+                                <select data-param="matType" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded bg-white">
+                                    <option value="">— All —</option>
+                                    <option value="IN">IN</option>
+                                    <option value="OUT">OUT</option>
+                                    <option value="ADJUST">ADJUST</option>
+                                </select>
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 w-3/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Material</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="matMaterial" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-matMaterial" data-params="matMaterial">
+                                <input type="text" data-param="matMaterial" placeholder="Search material" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Location</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="matLocation" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-matLocation" data-params="matLocation">
+                                <input type="text" data-param="matLocation" placeholder="Search location" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Qty change</th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Destination</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="matDestination" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-matDestination" data-params="matDestination">
+                                <input type="text" data-param="matDestination" placeholder="Search destination" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>User</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="user" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-user" data-params="user">
+                                <input type="text" data-param="user" placeholder="Search user" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Notes</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="notes" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-notes" data-params="notes">
+                                <input type="text" data-param="notes" placeholder="Search notes" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700">
+                    @if (Model.MaterialMovements.Any())
+                    {
+                        @foreach (var m in Model.MaterialMovements)
+                        {
+                            <tr class="transition-colors duration-150 hover:bg-slate-800/40">
+                                <td class="px-6 py-4 w-2/12 text-center text-slate-200">@TimeZoneInfo.ConvertTimeFromUtc(m.TimestampUtc, displayTz).ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="px-6 py-4 w-1/12 text-center font-medium text-white">@m.Type</td>
+                                <td class="px-6 py-4 w-3/12 text-center text-white">@m.Material?.Name</td>
+                                <td class="px-6 py-4 w-2/12 text-center text-slate-200">@m.Location?.Code</td>
+                                <td class="px-6 py-4 w-1/12 text-center text-slate-200">@(m.QuantityDelta >= 0 ? "+" : "")@m.QuantityDelta</td>
+                                <td class="px-6 py-4 w-1/12 text-center text-slate-200">@(m.BuildOrderId.HasValue ? "Order: " + (m.BuildOrder?.SerialNumber ?? m.BuildOrderId.ToString()) : (m.DestinationClient ?? "—"))</td>
+                                <td class="px-6 py-4 w-2/12 text-center text-slate-200">@m.PerformedBy</td>
+                                <td class="px-6 py-4 w-2/12 text-center text-slate-300">@(m.Notes ?? "—")</td>
+                                <td class="px-6 py-4 w-1/12 text-center">
+                                    <form method="post" asp-action="DeleteMaterialMovement" asp-controller="Inventory" class="inline" onsubmit="return confirm('Delete this movement?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@m.Id" />
+                                        <button type="submit" class="inline-flex items-center justify-center w-10 h-10 rounded-xl delete-btn" aria-label="Delete movement">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" /></svg>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="9" class="px-6 py-8 text-center text-slate-400">No material movements yet. Use Receive or Material Out to record movements.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2 class="text-lg time-report-heading mb-3">Item movements (putaway, pick, transfer)</h2>
+    <div class="time-report-panel rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-700 table-fixed w-full text-xs table-report">
+                <thead class="movements-header">
+                    <tr>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Date</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="date2" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-date2" data-params="dateFrom,dateTo">
+                                <div class="space-y-2">
+                                    <input type="date" data-param="dateFrom" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                    <input type="date" data-param="dateTo" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                </div>
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Type</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="itType" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[160px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-itType" data-params="itType">
+                                <select data-param="itType" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded bg-white">
+                                    <option value="">— All —</option>
+                                    <option value="IN">IN</option>
+                                    <option value="OUT">OUT</option>
+                                    <option value="TRANSFER">TRANSFER</option>
+                                    <option value="ADJUST">ADJUST</option>
+                                </select>
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>SKU</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="itSku" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-itSku" data-params="itSku">
+                                <input type="text" data-param="itSku" placeholder="Search SKU" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Item</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="itItem" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-itItem" data-params="itItem">
+                                <input type="text" data-param="itItem" placeholder="Search item" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Qty</th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>From</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="itFromLocation" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-itFromLocation" data-params="itFromLocation">
+                                <input type="text" data-param="itFromLocation" placeholder="Search from location" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>To</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="itToLocation" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-itToLocation" data-params="itToLocation">
+                                <input type="text" data-param="itToLocation" placeholder="Search to location" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>User</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="user2" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-user2" data-params="user">
+                                <input type="text" data-param="user" placeholder="Search user" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider relative">
+                            <div class="flex items-center justify-center gap-1">
+                                <span>Notes</span>
+                                <button type="button" class="movements-filter-btn p-0.5 rounded hover:bg-slate-200 text-slate-500" data-popover="notes2" title="Filter">🔍</button>
+                            </div>
+                            <div class="movements-filter-popover absolute left-1/2 -translate-x-1/2 top-full mt-1 min-w-[200px] p-3 bg-slate-100 border border-slate-300 rounded-lg shadow-lg hidden" id="popover-notes2" data-params="notes">
+                                <input type="text" data-param="notes" placeholder="Search notes" class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" />
+                                <div class="flex gap-1 mt-2">
+                                    <button type="button" class="movements-filter-search px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+                                    <button type="button" class="movements-filter-reset px-2 py-1 text-sm bg-slate-200 rounded hover:bg-slate-300">Reset</button>
+                                <a href="#" class="movements-filter-close block text-xs text-slate-500 mt-1">close</a>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700">
+                    @foreach (var m in Model.ItemMovements)
+                    {
+                        <tr class="transition-colors duration-150 hover:bg-slate-800/40">
+                            <td class="px-6 py-4 text-center text-slate-200">@TimeZoneInfo.ConvertTimeFromUtc(m.TimestampUtc, displayTz).ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="px-6 py-4 text-center font-medium text-white">@m.Type</td>
+                            <td class="px-6 py-4 text-center text-slate-200">@m.Item?.Sku</td>
+                            <td class="px-6 py-4 text-center text-white">@m.Item?.Name</td>
+                            <td class="px-6 py-4 text-center text-slate-200">@m.Quantity</td>
+                            <td class="px-6 py-4 text-center text-slate-200">@(m.FromLocation?.Code ?? "—")</td>
+                            <td class="px-6 py-4 text-center text-slate-200">@(m.ToLocation?.Code ?? "—")</td>
+                            <td class="px-6 py-4 text-center text-slate-200">@m.PerformedBy</td>
+                            <td class="px-6 py-4 text-center text-slate-300">@(m.Notes ?? "—")</td>
+                            <td class="px-6 py-4 text-center">
+                                <form method="post" asp-action="DeleteItemMovement" asp-controller="Inventory" class="inline" onsubmit="return confirm('Delete this movement?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@m.Id" />
+                                    <button type="submit" class="inline-flex items-center justify-center w-10 h-10 rounded-xl delete-btn" aria-label="Delete movement">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" /></svg>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @if (pagination != null)
+    {
+        <partial name="~/Pages/Shared/_Pagination.cshtml" model="pagination" />
+    }
+    </div>
+</div>
+
+<style>
+    /* Keep filter popovers on top of table, overflow, and other sections (e.g. when table is empty) */
+    .movements-filter-popover {
+        z-index: 9999;
+    }
+</style>
+
+<script>
+(function () {
+    function getQueryParams() {
+        var search = window.location.search || '';
+        var params = {};
+        if (search.charAt(0) === '?') search = search.slice(1);
+        search.split('&').forEach(function (part) {
+            var eq = part.indexOf('=');
+            var key = eq >= 0 ? decodeURIComponent(part.slice(0, eq).replace(/\+/g, ' ')) : decodeURIComponent(part.replace(/\+/g, ' '));
+            var val = eq >= 0 ? decodeURIComponent(part.slice(eq + 1).replace(/\+/g, ' ')) : '';
+            if (key) params[key] = val;
+        });
+        return params;
+    }
+    function buildUrl(params) {
+        var base = window.location.pathname;
+        var parts = [];
+        for (var k in params) {
+            if (params[k] !== '' && params[k] != null)
+                parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+        }
+        return base + (parts.length ? '?' + parts.join('&') : '');
+    }
+    function fillPopoverFromUrl(popover) {
+        var params = getQueryParams();
+        var paramStr = popover.getAttribute('data-params') || '';
+        paramStr.split(',').forEach(function (p) {
+            p = p.trim();
+            var input = popover.querySelector('[data-param="' + p + '"]');
+            if (input) input.value = params[p] || '';
+        });
+    }
+    function openPopover(btn) {
+        var id = btn.getAttribute('data-popover');
+        var popover = document.getElementById('popover-' + id);
+        if (!popover) return;
+        document.querySelectorAll('.movements-filter-popover').forEach(function (p) { p.classList.add('hidden'); });
+        fillPopoverFromUrl(popover);
+        popover.classList.remove('hidden');
+        popover.style.position = 'fixed';
+        popover.style.zIndex = '9999';
+        popover.style.transform = 'none';
+        var rect = btn.getBoundingClientRect();
+        requestAnimationFrame(function () {
+            var w = popover.offsetWidth;
+            var left = rect.left + (rect.width / 2) - (w / 2);
+            if (left < 8) left = 8;
+            if (left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
+            popover.style.left = left + 'px';
+            popover.style.top = (rect.bottom + 4) + 'px';
+        });
+    }
+    function closeAllPopovers() {
+        document.querySelectorAll('.movements-filter-popover').forEach(function (p) { p.classList.add('hidden'); });
+    }
+    function applySearch(popover) {
+        var params = getQueryParams();
+        var paramStr = popover.getAttribute('data-params') || '';
+        paramStr.split(',').forEach(function (p) {
+            p = p.trim();
+            var input = popover.querySelector('[data-param="' + p + '"]');
+            if (input) params[p] = (input.value || '').trim();
+        });
+        window.location.href = buildUrl(params);
+    }
+    function applyReset(popover) {
+        var params = getQueryParams();
+        var paramStr = popover.getAttribute('data-params') || '';
+        paramStr.split(',').forEach(function (p) {
+            p = p.trim();
+            delete params[p];
+        });
+        window.location.href = buildUrl(params);
+    }
+    document.querySelectorAll('.movements-filter-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var id = btn.getAttribute('data-popover');
+            var popover = document.getElementById('popover-' + id);
+            if (popover && popover.classList.contains('hidden')) {
+                openPopover(btn);
+            } else {
+                closeAllPopovers();
+            }
+        });
+    });
+    document.querySelectorAll('.movements-filter-search').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var popover = btn.closest('.movements-filter-popover');
+            if (popover) applySearch(popover);
+        });
+    });
+    document.querySelectorAll('.movements-filter-reset').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var popover = btn.closest('.movements-filter-popover');
+            if (popover) applyReset(popover);
+        });
+    });
+    document.querySelectorAll('.movements-filter-close').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            closeAllPopovers();
+        });
+    });
+    document.addEventListener('click', function () { closeAllPopovers(); });
+    document.querySelectorAll('.movements-filter-popover').forEach(function (p) {
+        p.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+})();
+</script>

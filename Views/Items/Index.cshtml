@@ -1,0 +1,87 @@
+@model IEnumerable<ManufacturingTimeTracking.Models.Inventory.Item>
+@{
+    ViewData["Title"] = "Items";
+    var q = (string)(ViewBag.Query ?? "");
+}
+
+<div class="animate-fade-in">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-bold text-slate-800">Items</h1>
+        <a asp-action="QuickCreate" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 w-fit">Quick add</a>
+    </div>
+    <form method="get" id="items-search-form" class="mb-6">
+        <div class="flex gap-2 flex-wrap">
+            <input id="items-search-input" name="q" value="@q" placeholder="Search by SKU or name" class="flex-1 min-w-[200px] px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+            <button type="submit" class="px-5 py-3 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition-all duration-200">Search</button>
+        </div>
+    </form>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 table-fixed w-full">
+                <thead class="bg-slate-50/80">
+                    <tr>
+                        <th class="px-6 py-4 text-center w-3/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">SKU</th>
+                        <th class="px-6 py-4 text-center w-3/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-4 text-center w-3/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Family</th>
+                        <th class="px-6 py-4 text-center w-2/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model/Type</th>
+                        <th class="px-6 py-4 text-center w-1/12 text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var i in Model)
+                    {
+                        <tr class="table-row-hover transition-colors duration-150">
+                            <td class="px-6 py-4 text-center w-3/12 font-medium text-slate-800">@i.Sku</td>
+                            <td class="px-6 py-4 text-center w-3/12 text-slate-600">@i.Name</td>
+                            <td class="px-6 py-4 text-center w-3/12 text-slate-600">@i.Family</td>
+                            <td class="px-6 py-4 text-center w-2/12 text-slate-600">@i.ModelOrType</td>
+                            <td class="px-6 py-4 text-center w-1/12">
+                                <a asp-action="Details" asp-route-id="@i.Id" class="inline-flex items-center px-4 py-2 rounded-lg border border-blue-600 text-blue-600 text-sm font-medium hover:bg-blue-50 transition-all duration-200">View</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @{
+        var pagination = ViewBag.Pagination as ManufacturingTimeTracking.Models.PaginationInfo;
+    }
+    @if (pagination != null)
+    {
+        <partial name="~/Pages/Shared/_Pagination.cshtml" model="pagination" />
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById('items-search-form');
+            const input = document.getElementById('items-search-input');
+            if (!form || !input) return;
+
+            const STORAGE_KEY = 'mti_items_search_focus';
+            let t = null;
+
+            input.addEventListener('input', function () {
+                try { sessionStorage.setItem(STORAGE_KEY, '1'); } catch (e) { }
+                if (t) window.clearTimeout(t);
+                t = window.setTimeout(function () {
+                    form.submit();
+                }, 350);
+            });
+
+            window.requestAnimationFrame(function () {
+                let shouldFocus = false;
+                try { shouldFocus = sessionStorage.getItem(STORAGE_KEY) === '1'; } catch (e) { }
+                if (!shouldFocus) return;
+                try {
+                    input.focus();
+                    const len = (input.value || '').length;
+                    input.setSelectionRange(len, len);
+                } catch (e) { }
+            });
+        })();
+    </script>
+}

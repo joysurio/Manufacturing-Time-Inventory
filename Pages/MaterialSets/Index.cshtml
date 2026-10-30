@@ -1,0 +1,98 @@
+@page
+@model ManufacturingTimeTracking.Pages.MaterialSets.IndexModel
+@{
+    ViewData["Title"] = "Material Sets";
+}
+
+<div class="animate-fade-in">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-bold text-slate-800">Material Sets</h1>
+        <a asp-page="Create" class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 w-fit">Create New Set</a>
+    </div>
+    <p class="text-slate-500 mb-6">Predefined groups of materials. Use a set in Material Out or on the Pick List to add all materials at once.</p>
+    <form method="get" id="materialsets-search-form" class="mb-6 flex flex-wrap gap-3 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <input type="text" id="materialsets-search-input" name="Search" value="@Model.Search" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Search by name or description..." />
+        </div>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Model.Search))
+        {
+            <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Clear</a>
+        }
+    </form>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 table-fixed w-full">
+                <thead class="bg-slate-50/80 ">
+                    <tr>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-4 w-2/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-4 w-4/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Materials</th>
+                        <th class="px-6 py-4 w-1/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Price</th>
+                        <th class="px-6 py-4 w-3/12 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var set in Model.MaterialSets)
+                    {
+                        <tr class="table-row-hover transition-colors duration-150">
+                            <td class="px-6 py-4 w-2/12 font-medium text-slate-800 text-center">
+                                <a asp-page="./Details" asp-route-id="@set.Id" class="text-blue-600 hover:text-blue-700 hover:underline">@set.Name</a>
+                            </td>
+                            <td class="px-6 py-4 w-2/12 text-slate-600 text-sm text-center">@(set.Description ?? "—")</td>
+                            <td class="px-6 py-4 w-4/12 text-slate-600 text-sm text-center">
+                                @set.Items.Count material(s): @string.Join(", ", set.Items.OrderBy(i => i.SortOrder).Select(i => $"{i.Material?.Name ?? "?"} x{i.Quantity}"))
+                            </td>
+                            <td class="px-6 py-4 w-1/12 text-slate-700 text-sm font-semibold text-center">
+                                @(Model.SetTotalPrices.TryGetValue(set.Id, out var price) && price.HasValue ? price.Value.ToString("N2") + " €" : "—")
+                            </td>
+                            <td class="px-6 py-4 w-3/12 text-center">
+                                <a asp-page="./Details" asp-route-id="@set.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-600 text-slate-700 text-sm font-medium hover:bg-slate-50 mr-2">Details</a>
+                                <a asp-page="./Edit" asp-route-id="@set.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 text-sm font-medium hover:bg-blue-50 mr-2">Edit</a>
+                                <a asp-page="./Duplicate" asp-route-id="@set.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 text-sm font-medium hover:bg-emerald-50 mr-2">Duplicate</a>
+                                <a asp-page="./Delete" asp-route-id="@set.Id" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-red-600 text-red-600 text-sm font-medium hover:bg-red-50">Delete</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @if (!Model.MaterialSets.Any())
+    {
+        <p class="text-slate-500 mt-4">No material sets yet. <a asp-page="Create" class="text-blue-600 hover:underline">Create one</a> to use in Material Out or the Pick List.</p>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById('materialsets-search-form');
+            const input = document.getElementById('materialsets-search-input');
+            if (!form || !input) return;
+
+            const STORAGE_KEY = 'mti_materialsets_search_focus';
+            let t = null;
+
+            input.addEventListener('input', function () {
+                try { sessionStorage.setItem(STORAGE_KEY, '1'); } catch (e) { }
+                if (t) window.clearTimeout(t);
+                t = window.setTimeout(function () {
+                    form.submit();
+                }, 350);
+            });
+
+            // Restore focus/caret after reload.
+            window.requestAnimationFrame(function () {
+                let shouldFocus = false;
+                try { shouldFocus = sessionStorage.getItem(STORAGE_KEY) === '1'; } catch (e) { }
+                if (!shouldFocus) return;
+                try {
+                    input.focus();
+                    const len = (input.value || '').length;
+                    input.setSelectionRange(len, len);
+                } catch (e) { }
+            });
+        })();
+    </script>
+}

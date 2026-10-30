@@ -1,0 +1,116 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.DetailsModel
+@{
+    ViewData["Title"] = "Order Details";
+}
+
+<div class="animate-fade-in">
+    <div class="flex flex-wrap gap-3 mb-6">
+        <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">Back to List</a>
+        <a asp-page="./PickList" asp-route-id="@Model.BuildOrder.Id" class="px-5 py-2.5 rounded-xl border border-blue-600 text-blue-600 font-medium hover:bg-blue-50 transition-all duration-200">Pick list (components)</a>
+        @if (!Model.BuildOrder.IsBlocked)
+        {
+            <a asp-page="./Execute" asp-route-id="@Model.BuildOrder.Id" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transition-all duration-200">Execute</a>
+        }
+        @if (User.IsInRole("Admin") || User.IsInRole("Supervisor"))
+        {
+            @if (Model.BuildOrder.IsBlocked)
+            {
+                <a asp-page="./Unblock" asp-route-id="@Model.BuildOrder.Id" class="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700">Unblock Order</a>
+            }
+            else
+            {
+                <a asp-page="./Block" asp-route-id="@Model.BuildOrder.Id" class="px-5 py-2.5 rounded-xl border border-amber-600 text-amber-700 font-medium hover:bg-amber-50">Block Order</a>
+            }
+        }
+    </div>
+
+    @if (Model.BuildOrder.IsBlocked)
+    {
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6">
+            <h2 class="text-lg font-semibold text-amber-800 mb-2">Order blocked</h2>
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div><dt class="font-medium text-amber-700">Reason</dt><dd class="text-amber-900">@(Model.BuildOrder.BlockedReason?.Name ?? "—")</dd></div>
+                <div><dt class="font-medium text-amber-700">Blocked at</dt><dd class="text-amber-900">@(Model.BuildOrder.BlockedAt?.ToString("g") ?? "—")</dd></div>
+                <div class="sm:col-span-2"><dt class="font-medium text-amber-700">Notes</dt><dd class="text-amber-900 mt-1">@(Model.BuildOrder.BlockedNotes ?? "—")</dd></div>
+            </dl>
+        </div>
+    }
+
+    @if (Model.ActiveInterruptions.Any())
+    {
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6">
+            <h2 class="text-lg font-semibold text-amber-800 mb-2">Active interruptions (this order)</h2>
+            <ul class="space-y-1.5 text-sm text-amber-900">
+                @foreach (var pi in Model.ActiveInterruptions)
+                {
+                    <li class="flex flex-wrap gap-2 items-start">
+                        <span class="font-medium">@pi.Category.ToString()</span>
+                        <span>—</span>
+                        <span>@pi.Notes</span>
+                        <span class="text-amber-600">(@pi.StartTime.ToString("g"))</span>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-slate-800 mb-4">Order Information</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><dt class="text-sm font-medium text-slate-500">External Ref</dt><dd class="font-medium text-slate-800">@Model.BuildOrder.ExternalRef</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Serial Number</dt><dd class="font-medium text-slate-800">@Model.BuildOrder.SerialNumber</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Model</dt><dd class="font-medium text-slate-800">@Model.MachineModelName</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Variant</dt><dd class="font-medium text-slate-800">@Model.MachineVariantName</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Status</dt><dd><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium @(Model.BuildOrder.Status == "InProgress" ? "bg-amber-100 text-amber-800" : Model.BuildOrder.Status == "Completed" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700")">@Model.BuildOrder.Status</span></dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Created</dt><dd class="font-medium text-slate-800">@Model.BuildOrder.CreatedAt.ToString("g")</dd></div>
+            @if (!string.IsNullOrEmpty(Model.BuildOrder.PlannedWeek))
+            {
+                <div><dt class="text-sm font-medium text-slate-500">Planned week</dt><dd class="font-medium text-slate-800">@Model.BuildOrder.PlannedWeek</dd></div>
+            }
+            <div><dt class="text-sm font-medium text-slate-500">Real hours</dt><dd class="font-medium text-slate-800">@Model.RealHours.ToString("N2") h</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Customer Identifier</dt><dd class="font-medium text-slate-800">@(string.IsNullOrWhiteSpace(Model.BuildOrder.CustomerIdentifier) ? "—" : Model.BuildOrder.CustomerIdentifier)</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Plant / Site</dt><dd class="font-medium text-slate-800">@(string.IsNullOrWhiteSpace(Model.BuildOrder.PlantName) ? "—" : Model.BuildOrder.PlantName)</dd></div>
+            <div><dt class="text-sm font-medium text-slate-500">Location</dt><dd class="font-medium text-slate-800">@(string.IsNullOrWhiteSpace(Model.BuildOrder.Location) ? "—" : Model.BuildOrder.Location)</dd></div>
+        </dl>
+    </div>
+
+    @if (Model.BuildOrder.Executions.Any())
+    {
+        @foreach (var execution in Model.BuildOrder.Executions.OrderByDescending(e => e.StartedAt))
+        {
+            <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+                <h2 class="text-lg font-semibold text-slate-800 mb-4">Execution — Started: @execution.StartedAt.ToString("g")</h2>
+                @foreach (var phase in execution.Phases.OrderBy(p => p.SortOrder))
+                {
+                    <h3 class="text-base font-medium text-slate-700 mt-4 mb-2">@phase.Name</h3>
+                    <div class="overflow-x-auto rounded-xl border border-slate-100">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50/80">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Step</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Status</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Total Time</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Runs</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach (var step in phase.Steps.OrderBy(s => s.SortOrder))
+                                {
+                                    var totalSeconds = step.Runs.Where(r => r.DurationSeconds.HasValue).Sum(r => r.DurationSeconds.Value);
+                                    var timeSpan = TimeSpan.FromSeconds(totalSeconds);
+                                    <tr class="table-row-hover">
+                                        <td class="px-4 py-3 font-medium text-slate-800">@step.Title</td>
+                                        <td class="px-4 py-3"><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">@step.State</span></td>
+                                        <td class="px-4 py-3 text-slate-600">@(totalSeconds > 0 ? timeSpan.ToString(@"hh\:mm\:ss") : "—")</td>
+                                        <td class="px-4 py-3 text-slate-600">@step.Runs.Count</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>

@@ -1,0 +1,81 @@
+@page
+@model ManufacturingTimeTracking.Pages.Admin.EmailSettingsModel
+@using Microsoft.AspNetCore.Authorization
+@{
+    ViewData["Title"] = "Email Settings";
+}
+
+<div class="animate-fade-in max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">SMTP Email Settings</h1>
+
+    <form method="post" asp-page-handler="Save">
+        <div class="grid grid-cols-1 gap-4">
+            <div>
+                <label class="block text-sm font-medium">Host</label>
+                <input asp-for="Host" class="input-dark w-full" />
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-sm font-medium">Port</label>
+                    <input asp-for="Port" class="input-dark w-full" type="number" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Enable SSL</label>
+                    <input asp-for="EnableSsl" type="checkbox" class="ml-2" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Timeout (ms)</label>
+                    <input asp-for="TimeoutMs" class="input-dark w-full" type="number" />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Username</label>
+                <input asp-for="Username" class="input-dark w-full" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Password</label>
+                <input asp-for="Password" class="input-dark w-full" type="password" />
+                <p class="text-xs text-slate-500 mt-1">If using Google with 2FA, use an App Password here.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">From address</label>
+                <input asp-for="FromAddress" class="input-dark w-full" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium">From name</label>
+                <input asp-for="FromName" class="input-dark w-full" />
+            </div>
+
+            <div class="flex gap-3 mt-2">
+                <button type="submit" class="btn-outline-luminous">Save settings</button>
+            </div>
+        </div>
+    </form>
+
+    <hr class="my-6" />
+
+    <h2 class="text-xl font-semibold mb-3">Send test email</h2>
+    <form method="post" asp-page-handler="SendTest">
+        <div class="grid grid-cols-1 gap-3">
+            <div>
+                <label class="block text-sm font-medium">Recipient</label>
+                <input asp-for="TestRecipient" class="input-dark w-full" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Subject</label>
+                <input asp-for="TestSubject" class="input-dark w-full" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Body (HTML)</label>
+                <textarea asp-for="TestBody" class="input-dark w-full" rows="6"></textarea>
+            </div>
+            <div class="flex gap-3">
+                <button type="submit" class="btn-outline-luminous">Send test email</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="mt-6 text-sm text-slate-500">
+        <p>Note: Saving writes to <code>appsettings.json</code> in the application folder. In production you may prefer to use environment variables or secret manager instead.</p>
+    </div>
+</div>

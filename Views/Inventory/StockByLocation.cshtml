@@ -1,0 +1,71 @@
+@model IEnumerable<StockByLocationRow>
+@{
+    ViewData["Title"] = "Stock by Location";
+}
+<div class="animate-fade-in">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Stock by Location</h1>
+    <p class="text-slate-500 mb-6">What material and how much you have in each location (materials only).</p>
+    <div class="mb-4">
+        <a asp-action="Stock" class="text-blue-600 hover:text-blue-700 font-medium text-sm">← Back to Stock</a>
+    </div>
+    @if (!Model.Any())
+    {
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-8 text-center text-slate-500">
+            No material stock in any location yet. Use <a asp-action="Receive" class="text-blue-600 hover:underline">Receive</a> to add materials.
+        </div>
+    }
+    else
+    {
+        @foreach (var loc in Model)
+        {
+            <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden mb-6">
+                <div class="px-6 py-4 bg-slate-50/80 border-b border-slate-100">
+                    <h2 class="text-lg font-semibold text-slate-800">@loc.LocationCode</h2>
+                    @if (!string.IsNullOrEmpty(loc.Zone))
+                    {
+                        <p class="text-sm text-slate-500">Zone: @loc.Zone</p>
+                    }
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50/50">
+                            <tr>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Material</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Quantity</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Updated</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach (var m in loc.Materials)
+                            {
+                                <tr class="table-row-hover transition-colors duration-150">
+                                    <td class="px-6 py-4 text-center font-medium text-slate-800">@m.MaterialName</td>
+                                    <td class="px-6 py-4 text-center text-slate-600">@m.Quantity</td>
+                                    <td class="px-6 py-4 text-center text-slate-600 text-sm">@m.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td class="px-6 py-4 text-center">
+                                        <form method="post" asp-action="DeleteMaterialStock" asp-controller="Inventory" class="inline" onsubmit="return confirm('Delete this stock row?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="materialId" value="@m.MaterialId" />
+                                            <input type="hidden" name="locationId" value="@m.LocationId" />
+                                            <button type="submit" class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-red-400 text-red-200 text-xs font-medium hover:bg-red-900/40" aria-label="Delete stock row">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14" /></svg>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+    @{
+        var pagination = ViewBag.Pagination as ManufacturingTimeTracking.Models.PaginationInfo;
+    }
+    @if (pagination != null)
+    {
+        <partial name="~/Pages/Shared/_Pagination.cshtml" model="pagination" />
+    }
+</div>

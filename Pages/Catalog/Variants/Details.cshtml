@@ -1,0 +1,130 @@
+@page "{id:int}"
+@model ManufacturingTimeTracking.Pages.Catalog.Variants.DetailsModel
+@{
+    ViewData["Title"] = "Variant Materials";
+}
+
+<div class="animate-fade-in w-full">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Variant Materials</h1>
+    <p class="text-slate-500 mb-6">
+        Configure materials for <strong>@Model.Variant.MachineModel.Name</strong> → <strong>@Model.Variant.Name (@Model.Variant.Code)</strong>.
+        These apply only to this variant, in addition to model-level components.
+    </p>
+
+    <div class="flex flex-wrap gap-3 mb-6">
+        <a asp-page="/Catalog/Models/Details" asp-route-id="@Model.Variant.MachineModelId" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">← Back to Model</a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 mb-6">
+        <h3 class="text-lg font-semibold text-slate-700 mb-3">Variant-specific components</h3>
+        <p class="text-slate-500 text-sm mb-4">Used to generate pick lists when creating a new order for this variant.</p>
+
+        @if (Model.Variant.Components.Any())
+        {
+            <div class="overflow-x-auto rounded-xl border border-slate-100">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50/80">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Material</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Qty</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Notes</th>
+                            <th class="px-4 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var c in Model.Variant.Components.OrderBy(c => c.Material != null ? c.Material.Name : c.Item != null ? c.Item.Sku : ""))
+                        {
+                            <tr class="table-row-hover">
+                                <td class="px-4 py-3 text-slate-800 font-medium">@(c.Material != null ? c.Material.Name : c.Item != null ? c.Item.Name + " (" + c.Item.Sku + ")" : "—")</td>
+                                <td class="px-4 py-3 text-slate-600">@c.Quantity</td>
+                                <td class="px-4 py-3 text-slate-500">@(c.Notes ?? "—")</td>
+                                <td class="px-4 py-3">
+                                    <form method="post" asp-page-handler="DeleteComponent" class="inline">
+                                        <input type="hidden" name="componentId" value="@c.Id" />
+                                        <input type="hidden" name="id" value="@Model.Variant.Id" />
+                                        <button type="submit" class="text-sm px-3 py-1 rounded-lg border border-red-600 text-red-600 hover:bg-red-50" onclick="return confirm('Remove this variant material?');">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p class="text-slate-500 text-sm mb-4">No variant-specific components yet.</p>
+        }
+
+        <form method="post" asp-page-handler="AddComponent" asp-route-id="@Model.Variant.Id" class="flex flex-wrap gap-4 items-end mt-4">
+            <div class="min-w-[220px] relative">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Material</label>
+                <input type="text" id="VariantMaterialInput" placeholder="Type to filter material…" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" autocomplete="off" />
+                <input type="hidden" asp-for="NewComponentMaterialId" id="NewVariantComponentMaterialId" />
+                <div id="VariantMaterialList" class="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-50 hidden" role="listbox"></div>
+                <script type="application/json" id="VariantMaterialData">@Html.Raw(Model.MaterialListJson)</script>
+            </div>
+            <div class="w-20">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Qty</label>
+                <input asp-for="NewComponentQuantity" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" type="number" min="1" />
+            </div>
+            <div class="min-w-[140px]">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+                <input asp-for="NewComponentNotes" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Optional" />
+            </div>
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md">Add variant material</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        // Material combobox: type to filter, click to select
+        (function() {
+            var input = document.getElementById('VariantMaterialInput');
+            var hidden = document.getElementById('NewVariantComponentMaterialId');
+            var listEl = document.getElementById('VariantMaterialList');
+            var dataEl = document.getElementById('VariantMaterialData');
+            if (!input || !hidden || !listEl || !dataEl) return;
+            var materials = [];
+            try { materials = JSON.parse(dataEl.textContent || '[]'); } catch (e) {}
+
+            function showList(filter) {
+                var q = (filter != null ? filter : input.value || '').trim().toLowerCase();
+                var filtered = !q ? materials : materials.filter(function(m) { return (m.Name || '').toLowerCase().indexOf(q) !== -1; });
+                listEl.innerHTML = '';
+                listEl.classList.remove('hidden');
+                filtered.forEach(function(m) {
+                    var div = document.createElement('div');
+                    div.setAttribute('role', 'option');
+                    div.className = 'px-4 py-2.5 cursor-pointer hover:bg-blue-50 text-slate-800 border-b border-slate-100 last:border-0';
+                    div.textContent = m.Name || '';
+                    div.dataset.id = m.Id;
+                    div.dataset.name = m.Name || '';
+                    div.addEventListener('click', function() {
+                        hidden.value = this.dataset.id;
+                        input.value = this.dataset.name;
+                        listEl.classList.add('hidden');
+                        input.focus();
+                    });
+                    listEl.appendChild(div);
+                });
+            }
+            function hideList() { listEl.classList.add('hidden'); }
+
+            input.addEventListener('focus', function() { showList(); });
+            input.addEventListener('input', function() {
+                if (!this.value.trim()) hidden.value = '';
+                showList(this.value);
+            });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { hideList(); this.blur(); }
+            });
+            document.addEventListener('click', function(e) {
+                if (e.target !== input && e.target !== listEl && !listEl.contains(e.target)) hideList();
+            });
+        })();
+    </script>
+}
+

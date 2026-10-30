@@ -1,0 +1,110 @@
+@model ReceiveViewModel
+@{
+    ViewData["Title"] = "Receive";
+    var materials = ViewBag.Materials as IEnumerable<Material> ?? new List<Material>();
+    var locations = ViewBag.Locations as SelectList ?? new SelectList(Enumerable.Empty<SelectListItem>());
+    var selectedMat = Model.MaterialId > 0 ? materials.FirstOrDefault(m => m.Id == Model.MaterialId) : null;
+    var materialInputValue = selectedMat != null ? (string.IsNullOrWhiteSpace(selectedMat.Reference) ? selectedMat.Name : selectedMat.Name + " (Ref: " + selectedMat.Reference + ")") : "";
+}
+<div class="animate-fade-in">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Receive Material</h1>
+    <p class="text-slate-500 mb-6">Add quantity to inventory for a material. Price and location default from the material but can be changed.</p>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 max-w-lg mx-auto">
+        <form asp-action="Receive" method="post" class="space-y-5">
+            @Html.AntiForgeryToken()
+            <!-- <div asp-validation-summary="All" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm"></div> -->
+            <div class="relative">
+                <label asp-for="MaterialId" class="block text-sm font-medium text-slate-700 mb-1.5">Material</label>
+                <input type="text" id="MaterialInput" placeholder="Type to search material…" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" autocomplete="off" value="@materialInputValue" />
+                <input type="hidden" asp-for="MaterialId" id="MaterialId" />
+                <div id="MaterialList" class="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-50 hidden" role="listbox"></div>
+                <script type="application/json" id="MaterialData">
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(materials.Select(m => new { m.Id, m.Name, m.Reference, Price = m.Price.HasValue ? m.Price.Value.ToString("N2", System.Globalization.CultureInfo.InvariantCulture) : "", LocationId = m.LocationId?.ToString() ?? "" })))
+                </script>
+            </div>
+            <div>
+                <label asp-for="Quantity" class="block text-sm font-medium text-slate-700 mb-1.5">Quantity</label>
+                <input asp-for="Quantity" type="number" min="1" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                <span asp-validation-for="Quantity" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="Price" class="block text-sm font-medium text-slate-700 mb-1.5">Price (optional)</label>
+                <input asp-for="Price" type="number" step="0.01" min="0" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" id="Price" />
+            </div>
+            <div>
+                <label asp-for="LocationId" class="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
+                <select asp-for="LocationId" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" asp-items="locations" id="LocationId" required>
+                    <option value="">— Select Location —</option>
+                </select>
+            </div>
+            <div class="flex gap-3 pt-2">
+            <div class="m-auto">
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Confirm Receive</button>
+                    <a asp-action="Stock" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function() {
+            var input = document.getElementById('MaterialInput');
+            var hidden = document.getElementById('MaterialId');
+            var listEl = document.getElementById('MaterialList');
+            var priceEl = document.getElementById('Price');
+            var locationEl = document.getElementById('LocationId');
+            var dataEl = document.getElementById('MaterialData');
+            if (!input || !hidden || !listEl || !dataEl) return;
+            var materials = [];
+            try { materials = JSON.parse(dataEl.textContent || '[]'); } catch (e) {}
+
+            function getMaterialDisplay(m) {
+                var name = m.Name || '';
+                var ref = m.Reference || '';
+                return ref ? name + ' (Ref: ' + ref + ')' : name;
+            }
+            function showList(filter) {
+                var q = (filter || input.value || '').trim().toLowerCase();
+                var filtered = !q ? materials : materials.filter(function(m) {
+                    var name = (m.Name || '').toLowerCase();
+                    var ref = (m.Reference || '').toLowerCase();
+                    return name.indexOf(q) !== -1 || ref.indexOf(q) !== -1;
+                });
+                listEl.innerHTML = '';
+                listEl.classList.remove('hidden');
+                filtered.forEach(function(m) {
+                    var displayText = getMaterialDisplay(m);
+                    var div = document.createElement('div');
+                    div.setAttribute('role', 'option');
+                    div.className = 'px-4 py-2.5 cursor-pointer hover:bg-blue-50 text-slate-800 border-b border-slate-100 last:border-0';
+                    div.textContent = displayText;
+                    div.dataset.id = m.Id;
+                    div.dataset.name = m.Name || '';
+                    div.dataset.price = m.Price || '';
+                    div.dataset.locationId = m.LocationId || '';
+                    div.addEventListener('click', function() {
+                        hidden.value = this.dataset.id;
+                        input.value = this.textContent;
+                        priceEl.value = this.dataset.price || '';
+                        if (this.dataset.locationId) locationEl.value = this.dataset.locationId;
+                        listEl.classList.add('hidden');
+                        input.focus();
+                    });
+                    listEl.appendChild(div);
+                });
+            }
+            function hideList() { listEl.classList.add('hidden'); }
+
+            input.addEventListener('focus', function() { showList(); });
+            input.addEventListener('input', function() { showList(this.value); });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { hideList(); this.blur(); }
+            });
+            document.addEventListener('click', function(e) {
+                if (e.target !== input && e.target !== listEl && !listEl.contains(e.target)) hideList();
+            });
+        })();
+    </script>
+}

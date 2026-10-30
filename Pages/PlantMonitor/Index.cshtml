@@ -1,0 +1,313 @@
+@page
+@model ManufacturingTimeTracking.Pages.PlantMonitor.IndexModel
+@{
+    ViewData["Title"] = "Plant Monitor";
+}
+
+<style>
+  /* Compact density helpers (keep local to Plant Monitor) */
+  .pm-card { min-height: 170px; }
+  .pm-k { font-size: 9px; letter-spacing: .08em; }
+  .pm-glow { position: relative; border-color: var(--pm-glow-color, #38bdf8); }
+  .pm-glow::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 0.75rem;
+    pointer-events: none;
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--pm-glow-color, #38bdf8) 85%, transparent),
+      0 0 0 8px color-mix(in srgb, var(--pm-glow-color, #38bdf8) 35%, transparent),
+      0 18px 45px color-mix(in srgb, var(--pm-glow-color, #38bdf8) 28%, transparent);
+  }
+  /* Alarm visuals */
+  .pm-alarm-orange { animation: pm-pulse-orange 1s infinite; }
+  .pm-alarm-red { animation: pm-pulse-red 0.6s infinite; }
+  @@keyframes pm-pulse-orange { 0% { box-shadow: 0 0 0 0 rgba(255,140,0,0.08);} 50% { box-shadow: 0 0 18px 6px rgba(255,140,0,0.06);} 100% { box-shadow: 0 0 0 0 rgba(255,140,0,0);} }
+  @@keyframes pm-pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.12);} 50% { box-shadow: 0 0 24px 10px rgba(255,0,0,0.08);} 100% { box-shadow: 0 0 0 0 rgba(255,0,0,0);} }
+  .pm-alarm-box-orange { border-color: #ff8c00 !important; }
+  .pm-alarm-box-red { border-color: #ff0000 !important; }
+  /* Strong background flash for visibility */
+  .pm-alarm-orange-bg { animation: pm-bg-pulse-orange 1s infinite; }
+  .pm-alarm-red-bg { animation: pm-bg-pulse-red 0.6s infinite; }
+  @@keyframes pm-bg-pulse-orange { 0% { background-color: rgba(255,140,0,0.06);} 50% { background-color: rgba(255,140,0,0.22);} 100% { background-color: rgba(255,140,0,0.06);} }
+  @@keyframes pm-bg-pulse-red { 0% { background-color: rgba(255,0,0,0.08);} 50% { background-color: rgba(255,0,0,0.26);} 100% { background-color: rgba(255,0,0,0.08);} }
+</style>
+
+<div class="animate-fade-in bg-slate-950 text-white rounded-3xl shadow-soft p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+        <div class="min-w-0">
+            <h1 class="text-xl font-bold text-white">Plant Monitor</h1>
+            <p class="text-slate-200 text-xs">Real-time view of what is being produced right now.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <label class="text-[11px] text-slate-200">Group by</label>
+            <select id="pm-groupby" class="px-2 py-1.5 rounded-md border border-slate-700 bg-slate-900 text-white text-sm">
+                <option value="Workstation" selected="@(Model.GroupBy == IndexModel.GroupByMode.Workstation)">Workstation</option>
+                <option value="Person" selected="@(Model.GroupBy == IndexModel.GroupByMode.Person)">Person</option>
+                <option value="Machine" selected="@(Model.GroupBy == IndexModel.GroupByMode.Machine)">Machine</option>
+            </select>
+
+            <label class="text-[11px] text-slate-200">Refresh</label>
+            <select id="pm-refresh" class="px-2 py-1.5 rounded-md border border-slate-700 bg-slate-900 text-white text-sm">
+                <option value="60000">1 min</option>
+                <option value="300000" selected>5 min</option>
+                <option value="600000">10 min</option>
+                <option value="900000">15 min</option>
+                <option value="1800000">30 min</option>
+            </select>
+            <button id="pm-refresh-now" type="button" class="px-3 py-1.5 rounded-md bg-green-700 text-white text-sm font-medium hover:bg-green-800">Refresh</button>
+        </div>
+    </div>
+
+    <div id="pm-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
+        @{ var glowPalette = new[] { "#f59e0b", "#ef4444", "#22c55e", "#9ca3af" }; var idx = 0; }
+        @foreach (var group in Model.Groups)
+        {
+            var isBusy = group.IsBusy;
+            var glow = glowPalette[idx % glowPalette.Length];
+            idx++;
+            <div class="pm-card pm-glow rounded-lg border shadow-soft bg-slate-900 overflow-hidden" style="--pm-glow-color:@glow; border-color:@glow" data-group-key="@group.Key">
+                <div class="px-3 py-2 border-b flex items-start justify-between gap-2" style="border-color: color-mix(in srgb, @glow 70%, transparent)">
+                    <div class="min-w-0">
+                        <div class="text-sm font-semibold text-white truncate leading-tight">@group.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(group.Subtitle))
+                        {
+                            <div class="text-[11px] text-slate-300 truncate leading-tight">@group.Subtitle</div>
+                        }
+                    </div>
+                    <div class="shrink-0">
+                        @if (isBusy)
+                        {
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium" style="background-color: color-mix(in srgb, @glow 25%, transparent); color: @glow">Busy</span>
+                        }
+                        else
+                        {
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-200">Idle</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="p-3 space-y-2">
+                    @if (!isBusy)
+                    {
+                        <div class="text-sm text-slate-300">—</div>
+                    }
+                    else
+                    {
+                        @foreach (var run in group.ActiveRuns)
+                        {
+                            <div class="rounded-md border border-slate-800 bg-slate-800/60 p-2.5">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <div class="pm-k uppercase tracking-wider text-slate-400">Machine</div>
+                                        <div class="text-sm font-medium text-white truncate leading-tight">
+                                            <a asp-page="/Orders/ReportTimeByUser" asp-route-OrderIdFilter="@run.OrderId" class="hover:underline">@run.MachineModel</a>
+                                        </div>
+                                        <div class="text-[11px] text-slate-300 truncate leading-tight">@run.MachineVariant</div>
+                                    </div>
+                                    <div>
+                                        <div class="pm-k uppercase tracking-wider text-slate-400">Serial</div>
+                                        <div class="text-sm font-medium text-white truncate leading-tight">
+                                            @if (!string.IsNullOrEmpty(run.SerialNumber))
+                                            {
+                                                <a asp-page="/Orders/ReportTimeByUser" asp-route-OrderIdFilter="@run.OrderId" class="hover:underline">@run.SerialNumber</a>
+                                            }
+                                            else
+                                            {
+                                                @run.SerialNumber
+                                            }
+                                        </div>
+                                        <div class="text-[11px] text-slate-300 truncate leading-tight">@run.OrderRef</div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-2">
+                                    <div class="pm-k uppercase tracking-wider text-slate-400">Task</div>
+                                    <div class="text-sm font-semibold text-white truncate leading-tight">@run.StepTitle</div>
+                                </div>
+
+                                <div class="mt-2 grid grid-cols-2 gap-2">
+                                    <div>
+                                        <div class="pm-k uppercase tracking-wider text-slate-400">Op</div>
+                                        @{
+                                            var disp = run.OperatorDisplayName ?? "";
+                                            var atPos = disp.IndexOf('@');
+                                            if (atPos > 0) disp = disp.Substring(0, atPos);
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(run.OperatorUserId))
+                                        {
+                                            var dateStr = run.StartedAtLocal.ToString("yyyy-MM-dd");
+                                            <a asp-page="/Orders/ReportTimeByUser" asp-route-UserIdFilter="@run.OperatorUserId" asp-route-FromDate="@dateStr" asp-route-ToDate="@dateStr" class="text-sm text-white truncate leading-tight hover:underline">@disp</a>
+                                        }
+                                        else
+                                        {
+                                            <div class="text-sm text-white truncate leading-tight">@disp</div>
+                                        }
+                                    </div>
+                                    <div>
+                                        <div class="pm-k uppercase tracking-wider text-slate-400">WS</div>
+                                        <div class="text-sm text-white truncate leading-tight">@run.WorkstationName</div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-2 grid grid-cols-2 gap-2">
+                                    <div>
+                                        <div class="pm-k uppercase tracking-wider text-slate-400">Used</div>
+                                        <div class="text-sm font-semibold text-white pm-elapsed" data-elapsed-seconds="@run.ElapsedSeconds" data-estimated-seconds="@(run.EstimatedSeconds.HasValue ? run.EstimatedSeconds.Value.ToString() : "")">@IndexModel.FormatDuration(run.ElapsedSeconds)</div>
+                                        @if (run.EstimatedSeconds.HasValue)
+                                        {
+                                            <div class="mt-1">
+                                                <div class="pm-k uppercase tracking-wider text-slate-400">Target</div>
+                                                <div class="text-sm text-slate-300">@IndexModel.FormatDuration(run.EstimatedSeconds.Value)</div>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div>
+                                        <div class="pm-k uppercase tracking-wider text-slate-400">Start</div>
+                                        <div class="text-sm text-white truncate">@run.StartedAtLocal.ToString("dd/MM HH:mm")</div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+(function(){
+  function formatDuration(sec){
+    sec = Math.max(0, Math.floor(sec || 0));
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    if (h > 0) return h + 'h ' + String(m).padStart(2,'0') + 'm';
+    return m + 'm ' + String(s).padStart(2,'0') + 's';
+  }
+
+  function updateElapsed(){
+    document.querySelectorAll('[data-elapsed-seconds]').forEach(function(el){
+      var v = parseInt(el.getAttribute('data-elapsed-seconds') || '0', 10);
+      v += 1;
+      el.setAttribute('data-elapsed-seconds', String(v));
+      el.textContent = formatDuration(v);
+    });
+  }
+
+  setInterval(updateElapsed, 1000);
+
+  // Audio alarm utilities (WebAudio)
+  let _pmAudioCtx = null;
+  function pmEnsureAudioContext() {
+    if (!_pmAudioCtx) {
+      try { _pmAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { _pmAudioCtx = null; }
+    }
+    return _pmAudioCtx;
+  }
+  function pmPlayBeep(freq, dur = 180, vol = 0.4) {
+    const ctx = pmEnsureAudioContext(); if (!ctx) return;
+    try {
+      const o = ctx.createOscillator(); const g = ctx.createGain(); o.type = 'sine'; o.frequency.value = freq; g.gain.value = vol; o.connect(g); g.connect(ctx.destination);
+      const now = ctx.currentTime; o.start(now); g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur/1000); o.stop(now + dur/1000 + 0.02);
+    } catch(e){}
+  }
+
+  // Track last alarm state and timestamp per run to allow repeating every minute while active
+  // Map key: DOM element (.pm-elapsed), value: { state: 0|1|2, ts: epoch_ms }
+  const pmLastState = new Map();
+
+  function pmCheckAlarms() {
+    document.querySelectorAll('.pm-elapsed').forEach(function(el){
+      try {
+        const runCard = el.closest('.pm-card');
+        const stepped = el.getAttribute('data-elapsed-seconds');
+        const estAttr = el.getAttribute('data-estimated-seconds');
+        if (!stepped) return;
+        const elapsed = Number(stepped);
+        const estimated = estAttr ? Number(estAttr) : null;
+        let desired = 0;
+        if (estimated && !isNaN(estimated) && estimated > 0) {
+          const pct = elapsed / estimated;
+          if (pct >= 1) desired = 2;
+          else if (pct >= 0.85) desired = 1;
+          else desired = 0;
+        } else {
+          // no estimate: nothing to do
+          desired = 0;
+        }
+
+        const runId = runCard ? runCard.getAttribute('data-group-key') + '|' + (el.closest('[data-elapsed-seconds]') ? el.closest('[data-elapsed-seconds]').getAttribute('data-elapsed-seconds') : '') : null;
+        const prev = pmLastState.get(el) || { state: 0, ts: 0 };
+        const last = prev.state || 0;
+        const lastTs = prev.ts || 0;
+        const now = Date.now();
+        // Update visuals
+        if (runCard) {
+          runCard.classList.remove('pm-alarm-orange','pm-alarm-red','pm-alarm-box-orange','pm-alarm-box-red','pm-alarm-orange-bg','pm-alarm-red-bg');
+          if (desired === 1) { runCard.classList.add('pm-alarm-orange','pm-alarm-box-orange','pm-alarm-orange-bg'); }
+          else if (desired === 2) { runCard.classList.add('pm-alarm-red','pm-alarm-box-red','pm-alarm-red-bg'); }
+        }
+        // Play sound on transition OR repeat every 60s while state remains active
+        if (desired !== last) {
+          // state changed
+          if (desired === 1) pmPlayBeep(880,160,0.35);
+          else if (desired === 2) { pmPlayBeep(440,140,0.6); setTimeout(()=>pmPlayBeep(440,140,0.6),240); }
+          pmLastState.set(el, { state: desired, ts: now });
+        } else if (desired !== 0) {
+          // same non-zero state: check repeat interval (60s)
+          if (now - lastTs >= 60000) {
+            if (desired === 1) pmPlayBeep(880,160,0.35);
+            else if (desired === 2) { pmPlayBeep(440,140,0.6); setTimeout(()=>pmPlayBeep(440,140,0.6),240); }
+            pmLastState.set(el, { state: desired, ts: now });
+          }
+        } else {
+          // cleared
+          pmLastState.set(el, { state: 0, ts: 0 });
+        }
+      } catch(e) { console.error(e); }
+    });
+  }
+
+  setInterval(pmCheckAlarms, 1500);
+
+  var groupSel = document.getElementById('pm-groupby');
+  if (groupSel) {
+    groupSel.addEventListener('change', function(){
+      var url = new URL(window.location.href);
+      url.searchParams.set('GroupBy', (this.value || 'Workstation'));
+      window.location.href = url.toString();
+    });
+  }
+
+  var refreshSel = document.getElementById('pm-refresh');
+  var refreshNow = document.getElementById('pm-refresh-now');
+  var refreshTimer;
+
+  async function fetchAndReload(){
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.set('handler', 'Snapshot');
+      var res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) return;
+      await res.json();
+      window.location.reload();
+    } catch(e) {
+      // ignore
+    }
+  }
+
+  function restartRefreshTimer(){
+    if (refreshTimer) clearInterval(refreshTimer);
+    var ms = parseInt(refreshSel && refreshSel.value ? refreshSel.value : '300000', 10);
+    refreshTimer = setInterval(fetchAndReload, ms);
+  }
+
+  if (refreshSel) refreshSel.addEventListener('change', restartRefreshTimer);
+  if (refreshNow) refreshNow.addEventListener('click', fetchAndReload);
+
+  restartRefreshTimer();
+})();
+</script>

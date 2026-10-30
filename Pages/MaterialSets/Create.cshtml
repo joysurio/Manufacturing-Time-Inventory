@@ -1,0 +1,167 @@
+@page
+@model ManufacturingTimeTracking.Pages.MaterialSets.CreateModel
+@{
+    ViewData["Title"] = "Create Material Set";
+}
+
+<div class="animate-fade-in max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Create Material Set</h1>
+    <p class="text-slate-500 mb-6">Define a set name and the materials included with their quantities.</p>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+        <form method="post" id="create-form" class="space-y-5">
+            <div asp-validation-summary="All" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm"></div>
+            <div>
+                <label asp-for="Name" class="block text-sm font-medium text-slate-700 mb-1.5">Set name</label>
+                <input asp-for="Name" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="e.g. Basic Installation Kit" />
+                <span asp-validation-for="Name" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="Description" class="block text-sm font-medium text-slate-700 mb-1.5">Description (optional)</label>
+                <input asp-for="Description" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Optional description" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Materials in set</label>
+                <div id="items-container" class="space-y-3">
+                    @for (var i = 0; i < Model.Items.Count; i++)
+                    {
+                        <div class="item-row flex gap-3 items-center flex-wrap">
+                            <input type="hidden" name="Items[@i].MaterialId" class="item-material-id" value="@Model.Items[i].MaterialId" />
+                            <input type="hidden" name="Items[@i].Quantity" class="item-quantity" value="@Model.Items[i].Quantity" />
+                            <div class="flex-1 min-w-[200px] relative">
+                                <input type="text" class="item-material-input w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Type to search material…" autocomplete="off" value="@(Model.MaterialsForScript.FirstOrDefault(m => m.Value == Model.Items[i].MaterialId.ToString()).Text ?? "")" />
+                                <div class="item-material-list absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-50 hidden" role="listbox"></div>
+                            </div>
+                            <div class="w-24">
+                                <input type="number" min="1" class="item-qty-input w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" value="@Model.Items[i].Quantity" data-index="@i" placeholder="Qty" />
+                            </div>
+                            <button type="button" class="remove-row px-3 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm">Remove</button>
+                        </div>
+                    }
+                </div>
+                <div class="flex justify-end mt-3">
+                    <button type="button" id="add-row" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add material</button>
+                </div>
+                <p class="text-slate-500 text-sm mt-2">Add one or more materials and the quantity for each. This set can then be used in Material Out or on the Pick List.</p>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Create Set</button>
+                <a asp-page="./Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function() {
+            var container = document.getElementById('items-container');
+            var addBtn = document.getElementById('add-row');
+            var form = document.getElementById('create-form');
+            var materialsOptions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                Model.MaterialsForScript.Select(m => new { value = m.Value, text = m.Text }).ToList()));
+
+            function getIndex() {
+                var rows = container.querySelectorAll('.item-row');
+                return rows.length;
+            }
+
+            function syncHiddenInputs() {
+                var rows = container.querySelectorAll('.item-row');
+                rows.forEach(function(row, idx) {
+                    var qty = row.querySelector('.item-qty-input');
+                    row.querySelector('.item-material-id').name = 'Items[' + idx + '].MaterialId';
+                    row.querySelector('.item-quantity').name = 'Items[' + idx + '].Quantity';
+                    row.querySelector('.item-quantity').value = qty ? qty.value : '1';
+                    if (qty) qty.setAttribute('data-index', idx);
+                });
+            }
+
+            function showMaterialList(inputEl, filter) {
+                var row = inputEl.closest('.item-row');
+                var listEl = row.querySelector('.item-material-list');
+                var hidden = row.querySelector('.item-material-id');
+                var q = (filter != null ? filter : inputEl.value || '').trim().toLowerCase();
+                var filtered = !q ? materialsOptions : (materialsOptions || []).filter(function(m) {
+                    var text = (m.text || '').toLowerCase();
+                    var val = (m.value || '').toLowerCase();
+                    return text.indexOf(q) !== -1 || val.indexOf(q) !== -1;
+                });
+                listEl.innerHTML = '';
+                listEl.classList.remove('hidden');
+                filtered.forEach(function(m) {
+                    var div = document.createElement('div');
+                    div.setAttribute('role', 'option');
+                    div.className = 'px-4 py-2.5 cursor-pointer hover:bg-blue-50 text-slate-800 border-b border-slate-100 last:border-0';
+                    div.textContent = m.text || '';
+                    div.dataset.id = m.value || '';
+                    div.dataset.text = m.text || '';
+                    div.addEventListener('click', function() {
+                        hidden.value = this.dataset.id;
+                        inputEl.value = this.dataset.text;
+                        listEl.classList.add('hidden');
+                        inputEl.blur();
+                        syncHiddenInputs();
+                    });
+                    listEl.appendChild(div);
+                });
+            }
+
+            function hideMaterialList(inputEl) {
+                var row = inputEl.closest('.item-row');
+                if (row) row.querySelector('.item-material-list').classList.add('hidden');
+            }
+
+            function attachMaterialInputEvents(inputEl) {
+                inputEl.addEventListener('focus', function() { showMaterialList(this); });
+                inputEl.addEventListener('input', function() { showMaterialList(this, this.value); });
+                inputEl.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') { hideMaterialList(this); this.blur(); }
+                });
+            }
+
+            document.addEventListener('click', function(ev) {
+                if (!ev.target.closest('.item-material-input') && !ev.target.closest('.item-material-list')) {
+                    container.querySelectorAll('.item-material-list').forEach(function(l) { l.classList.add('hidden'); });
+                }
+            });
+
+            addBtn.addEventListener('click', function() {
+                var idx = getIndex();
+                var row = document.createElement('div');
+                row.className = 'item-row flex gap-3 items-center flex-wrap';
+                row.innerHTML = '<input type="hidden" name="Items[' + idx + '].MaterialId" class="item-material-id" value="" />' +
+                    '<input type="hidden" name="Items[' + idx + '].Quantity" class="item-quantity" value="1" />' +
+                    '<div class="flex-1 min-w-[200px] relative">' +
+                    '<input type="text" class="item-material-input w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" placeholder="Type to search material…" autocomplete="off" />' +
+                    '<div class="item-material-list absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg z-50 hidden" role="listbox"></div></div>' +
+                    '<div class="w-24"><input type="number" min="1" class="item-qty-input w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" value="1" data-index="' + idx + '" placeholder="Qty" /></div>' +
+                    '<button type="button" class="remove-row px-3 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-sm">Remove</button>';
+                row.querySelector('.remove-row').addEventListener('click', function() {
+                    row.remove();
+                    syncHiddenInputs();
+                });
+                attachMaterialInputEvents(row.querySelector('.item-material-input'));
+                row.querySelector('.item-qty-input').addEventListener('input', syncHiddenInputs);
+                container.appendChild(row);
+                syncHiddenInputs();
+            });
+
+            container.querySelectorAll('.remove-row').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var row = btn.closest('.item-row');
+                    if (container.querySelectorAll('.item-row').length > 1) {
+                        row.remove();
+                        syncHiddenInputs();
+                    }
+                });
+            });
+            container.querySelectorAll('.item-material-input').forEach(attachMaterialInputEvents);
+            container.querySelectorAll('.item-qty-input').forEach(function(el) { el.addEventListener('input', syncHiddenInputs); });
+
+            form.addEventListener('submit', function() {
+                syncHiddenInputs();
+            });
+        })();
+    </script>
+}

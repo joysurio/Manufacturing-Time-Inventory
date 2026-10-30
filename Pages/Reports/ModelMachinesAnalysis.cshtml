@@ -1,0 +1,519 @@
+@page
+@model ManufacturingTimeTracking.Pages.Reports.ModelMachinesAnalysisModel
+@{
+    ViewData["Title"] = "Model Machines Analysis";
+}
+@{
+    // assign a deterministic variant index for a technician id
+    Func<string,int> badgeVariant = id => Math.Abs((id ?? string.Empty).GetHashCode()) % 6;
+    Func<double,string> FormatSeconds = secs => {
+        try {
+            if (double.IsNaN(secs) || double.IsInfinity(secs)) return "—";
+            if (secs < 0) secs = 0;
+            if (secs >= 3600) {
+                var ts = TimeSpan.FromSeconds(secs);
+                return string.Format("{0}:{1:D2}", (int)ts.TotalHours, ts.Minutes);
+            }
+            var m = (int)(secs / 60);
+            var s = (int)(secs % 60);
+            return string.Format("{0}:{1:D2}", m, s);
+        } catch { return "—"; }
+    };
+    // Always format as HH:mm (hours with two digits)
+    Func<double,string> FormatHours = secs => {
+        try {
+            if (double.IsNaN(secs) || double.IsInfinity(secs)) return "—";
+            if (secs < 0) secs = 0;
+            var ts = TimeSpan.FromSeconds(secs);
+            // use total hours (may be >24) formatted without leading days
+            return string.Format("{0:D2}:{1:D2}", (int)ts.TotalHours, ts.Minutes);
+        } catch { return "—"; }
+    };
+}
+<style>
+    .time-report-surface {
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.04), transparent 35%),
+                    radial-gradient(circle at 80% 0%, rgba(244,114,182,0.04), transparent 30%),
+                    #0a0f1f;
+        color: #f8fafc;
+        font-weight: 300;
+        border: 1px solid rgba(56,189,248,0.08);
+        box-shadow: 0 0 30px rgba(56,189,248,0.06), 0 0 60px rgba(56,189,248,0.03);
+    }
+    .time-report-heading { color: #fff; font-weight: 600; }
+    .input-dark { border: 1px solid rgba(148,163,184,0.08); background: #0f172a; color: #f8fafc; padding: .5rem; border-radius: .375rem; }
+    .input-dark::placeholder { color: rgba(248,250,252,0.45); }
+    /* when the control receives focus, keep entered text white */
+    .input-dark:focus { color: #ffffff !important; outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+    .input-dark:focus::placeholder { color: rgba(255,255,255,0.45); }
+    /* Ensure select text and dropdown options are white across browsers */
+    select.input-dark { color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; }
+    select.input-dark option { color: #ffffff !important; background-color: #0f172a !important; }
+    select.input-dark::-ms-value { color: #ffffff; }
+    .btn-dark { background: #2563eb; color: #fff; padding: .5rem 1rem; border-radius: .375rem; }
+    .serial-item { color: #cbd5e1; }
+    /* filter labels: centered and green */
+    .filter-label { color: #22c55e; text-align: center; display: block; }
+    /* Outline filter buttons: transparent with green border and green text */
+    .btn-outline-luminous { background: transparent; color: #22c55e; border: 1px solid rgba(34,197,94,0.65); padding: .5rem 1rem; border-radius: .375rem; box-shadow: none; transition: box-shadow .18s ease, border-color .12s ease, transform .08s ease; font-weight: 600; }
+    .btn-outline-luminous:hover { border-color: rgba(34,197,94,0.95); box-shadow: 0 6px 24px rgba(34,197,94,0.06); transform: translateY(-2px); background: rgba(34,197,94,0.03); }
+    .table-dark { width: 100%; border-collapse: collapse; }
+    .table-dark thead { background: rgba(15,23,42,0.6); }
+    .table-dark th { color: #e2e8f0; border: 1px solid rgba(148,163,184,0.06); }
+    /* Keep first column visible when horizontally scrolling */
+    .table-dark thead th:first-child,
+    .table-dark tbody td:first-child {
+        position: -webkit-sticky; /* Safari */
+        position: sticky;
+        left: 0;
+        z-index: 4;
+        background: linear-gradient(90deg,#4858d9,#2f7be6); /* give contrast similar to header */
+        color: #fff;
+        /* ensure a small separation */
+        box-shadow: 2px 0 6px rgba(0,0,0,0.25);
+    }
+    .table-dark tbody td:first-child { z-index: 2; background: #0f172a; }
+    /* remove full cell borders and use very thin white separators between rows */
+    .table-dark td { color: #e2e8f0; border: none; background: transparent; }
+    .highlight-min { border-left: 4px solid rgba(34,197,94,0.8); }
+    .highlight-max { border-left: 4px solid rgba(239,68,68,0.8); }
+
+    /* Header styling will be applied inline per column to match palette */
+    .table-dark thead tr:first-child th { color: #fff; font-weight: 700; border: none; padding: .9rem 1rem; }
+    .table-dark thead tr:first-child th:first-child { border-top-left-radius: .75rem; }
+    .table-dark thead tr:first-child th:last-child { border-top-right-radius: .75rem; color: #0b1220; }
+
+    /* Ensure all table text is centered */
+    .table-dark th, .table-dark td { text-align: center; }
+
+    /* Body rows: darker separators and subtle hover */
+    /* very thin white line between rows */
+    .table-dark tbody tr { border-bottom: 0.5px solid rgba(255,255,255,0.06); }
+    .table-dark tbody tr:hover { background: rgba(255,255,255,0.01); }
+
+    /* Make badge lists centered */
+    .table-dark td ul { padding: 0; margin: 0; list-style: none; display: flex; flex-direction: column; align-items: center; gap: .4rem; }
+
+    /* User badge styles and color variants */
+    .user-badge { display: inline-block; padding: .25rem .6rem; border-radius: 999px; color: #fff; font-size: .75rem; font-weight:600; }
+    .user-badge.v0 { background: #2bb6a3; }
+    .user-badge.v1 { background: #6fb0e6; }
+    .user-badge.v2 { background: #8bc34a; }
+    .user-badge.v3 { background: #d6883a; }
+    .user-badge.v4 { background: #b55d6a; }
+    .user-badge.v5 { background: #6b5fd6; }
+    /* Technician name colored variants */
+    .tech-name { font-weight:600; margin-right: .45rem; }
+    .tech-name.v0 { color: #2bb6a3; }
+    .tech-name.v1 { color: #6fb0e6; }
+    .tech-name.v2 { color: #8bc34a; }
+    .tech-name.v3 { color: #d6883a; }
+    .tech-name.v4 { color: #b55d6a; }
+    .tech-name.v5 { color: #6b5fd6; }
+</style>
+
+<div class="animate-fade-in">
+    <form id="antiForgeryForm">@Html.AntiForgeryToken()</form>
+    <div class="time-report-surface rounded-2xl p-6">
+        <h1 class="text-xl time-report-heading mb-4">Model Machines Analysis</h1>
+
+    <form method="get" class="flex gap-3 items-end mb-4">
+    <div>
+            <label class="block text-sm filter-label">Model</label>
+            <select asp-for="SelectedModelId" asp-items="Model.ModelSelectList" class="input-dark" onchange="loadVariants(this.value)"></select>
+        </div>
+        <div>
+            <label class="block text-sm filter-label">Variant</label>
+            <select asp-for="SelectedVariantId" asp-items="Model.VariantSelectList" class="input-dark" id="SelectedVariantId">
+                <option value="">? All ?</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm filter-label">From</label>
+            <input asp-for="FromDate" type="date" class="input-dark" />
+        </div>
+        <div>
+            <label class="block text-sm filter-label">To</label>
+            <input asp-for="ToDate" type="date" class="input-dark" />
+        </div>
+        <div>
+            <label class="block text-sm filter-label">Technician</label>
+            <select asp-for="TechnicianId" class="input-dark">
+                <option value="">— All —</option>
+                @foreach (var item in Model.TechnicianList ?? Enumerable.Empty<SelectListItem>())
+                {
+                    <option value="@item.Value" selected="@(item.Value == Model.TechnicianId)">@item.Text</option>
+                }
+            </select>
+        </div>
+        <div>
+            <button type="submit" class="btn-outline-luminous">Apply</button>
+        </div>
+        <div>
+            <label class="block text-sm filter-label">Show hidden</label>
+            <input asp-for="ShowHidden" type="checkbox" class="input-dark" onchange="this.form.submit()" />
+        </div>
+    </form>
+
+    <div class="mb-4">
+        <h3 class="text-sm font-semibold mb-2">Serials</h3>
+        <form method="get" id="serialsForm">
+            <input type="hidden" name="SelectedModelId" value="@Model.SelectedModelId" />
+            <input type="hidden" name="SelectedVariantId" value="@(Model.SelectedVariantId?.ToString() ?? "")" />
+            <input type="hidden" name="FromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd") ?? "")" />
+            <input type="hidden" name="ToDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd") ?? "")" />
+            <input type="hidden" name="TechnicianId" value="@Model.TechnicianId" />
+            <div class="flex flex-wrap gap-2">
+                @foreach (var s in Model.AvailableSerials)
+                {
+                    var key = ManufacturingTimeTracking.Pages.Reports.ModelMachinesAnalysisModel.KeyFor(s.OrderId, s.Serial);
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="SelectedSerialKeys" value="@key" @(Model.ColumnSerialKeys.Contains(key) ? "checked" : "") class="form-checkbox" />
+                        <span class="text-sm">@s.ExternalRef @if(!string.IsNullOrEmpty(s.Serial)){<text>/ @s.Serial</text>}</span>
+                    </label>
+                }
+            </div>
+            <div class="mt-2">
+                <button type="submit" form="serialsForm" class="btn-outline-luminous">Apply serial selection</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="overflow-x-auto">
+        @{ var headerPalette = new[] { "#4858d9", "#2b7ea8", "#5fb16a", "#f59e0b", "#ef6c63", "#6b5fd6", "#38bdf8", "#60a5fa" }; }
+        <table class="min-w-full text-sm table-dark">
+            <thead class="text-left text-xs">
+                <tr>
+                    <th class="px-3 py-2 border" style="background: linear-gradient(90deg,#4858d9,#2f7be6);">Step</th>
+                    @for (int i = 0; i < Model.ColumnSerialKeys.Count; i++)
+                    {
+                        var sk = Model.ColumnSerialKeys[i];
+                        var parts = sk.Split('|');
+                        var serial = parts.Length > 1 ? parts[1] : sk;
+                        var orderId = parts.Length > 0 ? parts[0] : "";
+                        var color = headerPalette[i % headerPalette.Length];
+                        <th class="px-3 py-2 text-center" style="background: linear-gradient(90deg,@(color), rgba(15,23,42,0.12));">
+                            @if (!string.IsNullOrEmpty(orderId))
+                            {
+                                <a asp-page="/Orders/Details" asp-route-id="@orderId" class="text-white hover:underline">@serial</a>
+                            }
+                            else
+                            {
+                                @serial
+                            }
+                        </th>
+                    }
+                    <th class="px-3 py-2 text-center">Target</th>
+                    <th class="px-3 py-2 text-center">Mean</th>
+                    <th class="px-3 py-2 text-center">Median</th>
+                </tr>
+                <tr>
+                    <th class="px-3 py-2">Total hours</th>
+                    @foreach (var sk in Model.ColumnSerialKeys)
+                    {
+                        var secs = Model.SerialTotalSeconds.TryGetValue(sk, out var s) ? s : 0;
+                        <th class="px-3 py-2 text-center">@FormatHours(secs)</th>
+                    }
+                    <th id="target-total-header" class="px-3 py-2 text-center">@FormatHours(Model.TotalTargetSeconds)</th>
+                    <th class="px-3 py-2 text-center">&nbsp;</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var step in Model.StepTitles)
+                {
+                    // Precompute valid totals per serial for highlighting
+                    var validTotals = Model.ColumnSerialKeys.Select(sk =>
+                    {
+                        var total = 0;
+                        if (Model.Matrix.TryGetValue(step, out var row) && row.TryGetValue(sk, out var techs)) total = techs.Values.Sum();
+                        return total;
+                    }).ToList();
+
+                    // Filter valid values
+                    var validRange = validTotals.Where(v => v >= 300 && v <= 21600).ToList();
+                    var minVal = validRange.Any() ? validRange.Min() : (int?)null;
+                    var maxVal = validRange.Any() ? validRange.Max() : (int?)null;
+
+                    <tr>
+                        <td class="px-3 py-2 border align-top">
+                            @if (Model.StepTitleToTemplateId.TryGetValue(step, out var tid) && tid.HasValue)
+                            {
+                                <span style="display: inline-flex; align-items: center; gap: .5rem;">
+                                    <a asp-page="/Templates/EditStep" asp-route-id="@tid.Value" asp-route-returnUrl="@(Request.Path + Request.QueryString)" class="text-white hover:underline">@step</a>
+                                    @{ var hiddenState = Model.StepTitleHidden.TryGetValue(step, out var hv) ? hv : null; }
+                                    <button type="button" class="eye-toggle-btn" onclick="toggleHidden(@tid.Value, this)" data-requires-responsable="true" data-action="toggleHidden" data-template-id="@tid.Value" data-hidden="@(hiddenState.HasValue ? hiddenState.Value.ToString().ToLower() : "")" title="Toggle hidden" style="background:transparent;border:none;color:#fff;cursor:pointer;">
+                                        @if (hiddenState == true)
+                                        {
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.94 6.06L6.06 17.94" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        }
+                                        else if (hiddenState == false)
+                                        {
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        }
+                                        else
+                                        {
+                                            @step
+                                        }
+                                    </button>
+                                </span>
+                            }
+                            else
+                            {
+                                @step
+                            }
+                        </td>
+                        @foreach (var sk in Model.ColumnSerialKeys)
+                        {
+                            var cell = Model.Matrix.TryGetValue(step, out var row) && row.TryGetValue(sk, out var techs) ? techs : null;
+                            var total = cell?.Values.Sum() ?? 0;
+                            var cls = "";
+                            if (total >= 300 && total <= 21600)
+                            {
+                                if (minVal.HasValue && total == minVal.Value) cls = "highlight-min";
+                                if (maxVal.HasValue && total == maxVal.Value) cls = "highlight-max";
+                            }
+                            <td class="px-3 py-2 align-top @cls">
+                                @if (cell != null && cell.Any())
+                                {
+                                    <ul class="text-xs">
+                                    @foreach (var kv in cell.OrderBy(k=> Model.UserDisplayNames.ContainsKey(k.Key) ? Model.UserDisplayNames[k.Key] : k.Key))
+                                    {
+                                        var techId = kv.Key;
+                                        var secs = kv.Value;
+                                        var name = Model.UserDisplayNames.TryGetValue(techId, out var dn) && !string.IsNullOrWhiteSpace(dn) ? dn : techId;
+                                        var v = badgeVariant(techId);
+                                            <li>
+                                            <span class="tech-name v@(v)">@name</span>
+                                            <span class="user-badge v@(v)">@FormatHours(secs)</span>
+                                        </li>
+                                    }
+                                    </ul>
+                                }
+                            </td>
+                        }
+                        @{
+                            var stats = Model.StepStatsMap.TryGetValue(step, out var st) ? st : null;
+                            string meanText = stats != null && stats.ValidCount > 0 ? FormatHours(stats.MeanSeconds) : "—";
+                            string medText = stats != null && stats.ValidCount > 0 ? FormatHours(stats.MedianSeconds) : "—";
+                            var targetSeconds = Model.StepTitleTargetSeconds.TryGetValue(step, out var ts) ? ts : null;
+                        }
+                        <td class="px-3 py-2 border text-center">
+                            @if (Model.StepTitleToTemplateId.TryGetValue(step, out var tId) && tId.HasValue)
+                            {
+                                var medianForStep = (stats != null && stats.ValidCount > 0 && stats.MedianSeconds > 0) ? (int?)stats.MedianSeconds : null;
+                                var display = targetSeconds.HasValue ? FormatHours(targetSeconds.Value) : "—";
+                                <span class="target-value" data-template-id="@tId.Value" data-median="@(medianForStep.HasValue ? medianForStep.Value.ToString() : "")" onclick="startEditTarget(this)" style="cursor:pointer;color:#fff;text-decoration:underline;">@display</span>
+                            }
+                            else
+                            {
+                                <span>@(targetSeconds.HasValue ? FormatHours(targetSeconds.Value) : "—")</span>
+                            }
+                        </td>
+                        <td class="px-3 py-2 border text-center">@meanText</td>
+                        <td class="px-3 py-2 border text-center">@medText</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    async function loadVariants(modelId) {
+        try {
+            const url = `${location.pathname}?handler=Variants&modelId=${encodeURIComponent(modelId)}`;
+            const resp = await fetch(url, { credentials: 'same-origin' });
+            if (!resp.ok) {
+                console.error('Failed to load variants', resp.statusText);
+                return;
+            }
+            const variants = await resp.json();
+            const sel = document.getElementById('SelectedVariantId');
+            if (!sel) return;
+            // clear existing options
+            sel.innerHTML = '';
+            // add 'All' option
+            const allOpt = document.createElement('option');
+            allOpt.value = '';
+            allOpt.text = '? All ?';
+            sel.appendChild(allOpt);
+            // populate
+            variants.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v.id;
+                opt.text = v.name;
+                sel.appendChild(opt);
+            });
+        } catch (err) {
+            console.error(err);
+        }
+    }
+</script>
+
+<script>
+    function recalcTotalTarget() {
+        try {
+            const elems = Array.from(document.querySelectorAll('.target-value'));
+            let total = 0;
+            elems.forEach(e => {
+                const txt = e.textContent.trim();
+                if (!txt || txt === '—') return;
+                const secs = parseTimeStringToSeconds(txt);
+                if (secs != null && !isNaN(secs)) total += Number(secs);
+            });
+            const header = document.getElementById('target-total-header');
+            if (header) {
+                const hours = total / 3600.0;
+                // format like server: max 2 decimals, trim trailing zeros
+                let val = Math.round(hours * 100) / 100;
+                let s = val.toString();
+                if (s.indexOf('.') >= 0) s = s.replace(/\.0+$|0+$/,'');
+                header.textContent = s + ' h';
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() { recalcTotalTarget(); });
+</script>
+
+<script>
+    function formatSecondsDisplay(sec) {
+        if (sec == null) return '—';
+        sec = Number(sec);
+        if (isNaN(sec)) return '—';
+        // Always format as HH:mm (hours:minutes) for consistency
+        const hours = Math.floor(sec / 3600);
+        const minutes = Math.floor((sec % 3600) / 60);
+        return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}`;
+    }
+
+    function parseTimeStringToSeconds(str) {
+        if (!str) return null;
+        str = str.trim();
+        // Accept formats: h:mm:ss, H:mm (hours:minutes), m:ss, ss
+        const parts = str.split(':').map(p => p.trim());
+        if (parts.length === 1) {
+            const v = Number(parts[0]); if (isNaN(v)) return null; return Math.round(v);
+        }
+        if (parts.length === 2) {
+            // Treat two-part values as H:MM (hours:minutes)
+            const h = Number(parts[0]); const m = Number(parts[1]); if (isNaN(h) || isNaN(m)) return null; return h * 3600 + m * 60;
+        }
+        if (parts.length === 3) {
+            const h = Number(parts[0]); const m = Number(parts[1]); const s = Number(parts[2]); if (isNaN(h) || isNaN(m) || isNaN(s)) return null; return h * 3600 + m * 60 + s;
+        }
+        return null;
+    }
+
+    function startEditTarget(el) {
+        try {
+            const templateId = el.getAttribute('data-template-id');
+            const medianAttr = el.getAttribute('data-median');
+            const median = medianAttr ? Number(medianAttr) : null;
+            // create input prefilled with median formatted
+            const currentText = el.textContent.trim();
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentText === '—' ? (median != null ? formatSecondsDisplay(median) : '') : currentText;
+            input.style.minWidth = '70px';
+            // Ensure the default median value is readable: use black text on white background
+            input.style.color = '#000';
+            input.style.background = '#fff';
+            input.style.border = '1px solid #ccc';
+            input.style.borderRadius = '4px';
+            // create save and cancel
+            const saveBtn = document.createElement('button'); saveBtn.textContent = 'Save'; saveBtn.style.marginLeft='6px';
+            saveBtn.style.color = '#000'; saveBtn.style.background = '#fff'; saveBtn.style.border = '1px solid #ccc'; saveBtn.style.padding = '4px 8px'; saveBtn.style.borderRadius = '4px';
+            const cancelBtn = document.createElement('button'); cancelBtn.textContent = 'Cancel'; cancelBtn.style.marginLeft='4px';
+            cancelBtn.style.color = '#000'; cancelBtn.style.background = '#fff'; cancelBtn.style.border = '1px solid #ccc'; cancelBtn.style.padding = '4px 8px'; cancelBtn.style.borderRadius = '4px';
+
+            const container = document.createElement('span');
+            container.appendChild(input); container.appendChild(saveBtn); container.appendChild(cancelBtn);
+
+            const parent = el.parentNode;
+            parent.replaceChild(container, el);
+
+            cancelBtn.onclick = function(e) { e.preventDefault(); parent.replaceChild(el, container); };
+
+            saveBtn.onclick = async function(e) {
+                e.preventDefault();
+                const val = input.value.trim();
+                const secs = parseTimeStringToSeconds(val);
+                if (secs == null) {
+                    alert('Invalid time format. Use h:mm:ss or m:ss or seconds.');
+                    return;
+                }
+                // send AJAX
+                const tokenInput = document.querySelector('#antiForgeryForm input[name="__RequestVerificationToken"]');
+                const token = tokenInput ? tokenInput.value : null;
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['RequestVerificationToken'] = token;
+                saveBtn.disabled = true; cancelBtn.disabled = true;
+                try {
+                    const resp = await fetch(location.pathname + '?handler=UpdateTarget', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ templateId: Number(templateId), targetSeconds: secs }),
+                        credentials: 'same-origin'
+                    });
+                    if (!resp.ok) { alert('Save failed'); saveBtn.disabled = false; cancelBtn.disabled = false; return; }
+                    const data = await resp.json();
+                    if (data && data.success) {
+                        const newText = data.targetSeconds != null ? formatSecondsDisplay(data.targetSeconds) : '—';
+                        const newSpan = document.createElement('span');
+                        newSpan.className = 'target-value';
+                        newSpan.setAttribute('data-template-id', templateId);
+                        newSpan.setAttribute('data-median', median);
+                        newSpan.onclick = function() { startEditTarget(this); };
+                        newSpan.style.cursor='pointer'; newSpan.style.color='#fff'; newSpan.style.textDecoration='underline';
+                        newSpan.textContent = newText;
+                        parent.replaceChild(newSpan, container);
+                        // Recalculate total target header
+                        recalcTotalTarget();
+                    } else {
+                        alert('Save failed');
+                        saveBtn.disabled = false; cancelBtn.disabled = false;
+                    }
+                } catch (err) { console.error(err); alert('Save failed'); saveBtn.disabled = false; cancelBtn.disabled = false; }
+            };
+        } catch (err) { console.error(err); }
+    }
+</script>
+
+<script>
+    async function toggleHidden(templateId, btn) {
+        try {
+            btn.disabled = true;
+            // find antiforgery token
+            const tokenInput = document.querySelector('#antiForgeryForm input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : null;
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['RequestVerificationToken'] = token;
+
+            const resp = await fetch(location.pathname + '?handler=ToggleHidden', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ templateId: templateId }),
+                credentials: 'same-origin'
+            });
+            if (!resp.ok) {
+                console.error('Toggle failed', resp.statusText);
+                btn.disabled = false;
+                return;
+            }
+            const data = await resp.json();
+            if (data && data.success) {
+                // update button icon (data-hidden attr)
+                btn.setAttribute('data-hidden', data.hidden ? 'true' : 'false');
+                // replace inner svg
+                btn.innerHTML = data.hidden
+                    ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.94 6.06L6.06 17.94" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+                    : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            }
+            btn.disabled = false;
+        } catch (err) {
+            console.error(err);
+            btn.disabled = false;
+        }
+    }
+</script>

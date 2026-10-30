@@ -1,0 +1,122 @@
+@model ManufacturingTimeTracking.Models.Inventory.StoragePickIndexViewModel
+@{
+    ViewData["Title"] = "Storage Pick";
+}
+<div class="animate-fade-in">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Storage Pick</h1>
+            <p class="text-slate-500 text-sm mt-1">Load stock from IT.Storage and request robot pick (quantity 1 per article).</p>
+        </div>
+        <form asp-action="LoadStock" method="post" class="shrink-0">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="inline-flex items-center px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 text-sm shadow-soft">
+                Load from IT.Storage
+            </button>
+        </form>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="mb-4 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">@Model.StatusMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm">@Model.ErrorMessage</div>
+    }
+
+    @if (Model.StockLoaded && Model.Rows.Count > 0)
+    {
+        <form asp-action="RequestPick" method="post" id="storagePickForm">
+            @Html.AntiForgeryToken()
+            <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50/80">
+                            <tr>
+                                <th class="px-4 py-3 text-left w-12">
+                                    <input type="checkbox" id="selectAll" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" title="Select all" />
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Article ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Form</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Unit</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @for (var i = 0; i < Model.Rows.Count; i++)
+                            {
+                                var row = Model.Rows[i];
+                                <tr class="hover:bg-slate-50/50">
+                                    <td class="px-4 py-3">
+                                        <input type="checkbox"
+                                               name="selectedArticleIds"
+                                               value="@row.ArticleId"
+                                               class="row-select rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                               @(row.Selected ? "checked" : null) />
+                                    </td>
+                                    <td class="px-6 py-3 text-sm font-mono text-slate-800">@row.ArticleId</td>
+                                    <td class="px-6 py-3 text-sm text-slate-700">@row.Name</td>
+                                    <td class="px-6 py-3 text-sm text-slate-600">@row.DosageForm</td>
+                                    <td class="px-6 py-3 text-sm text-slate-600">@row.PackagingUnit</td>
+                                    <td class="px-6 py-3 text-sm text-center text-slate-700">@row.QuantityAvailable</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+                    <span class="text-sm text-slate-500" id="selectedCount">0 selected</span>
+                    <button type="submit" id="requestPickBtn" disabled
+                            class="inline-flex items-center px-5 py-2.5 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                        Request pick
+                    </button>
+                </div>
+            </div>
+        </form>
+    }
+    else if (Model.StockLoaded)
+    {
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 px-6 py-12 text-center text-slate-500">
+            No articles with available quantity in IT.Storage.
+        </div>
+    }
+    else
+    {
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 px-6 py-12 text-center text-slate-500">
+            Click <strong>Load from IT.Storage</strong> to retrieve the current robot stock list.
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var selectAll = document.getElementById('selectAll');
+            var rowChecks = document.querySelectorAll('.row-select');
+            var pickBtn = document.getElementById('requestPickBtn');
+            var countLabel = document.getElementById('selectedCount');
+            if (!rowChecks.length) return;
+
+            function updateState() {
+                var checked = document.querySelectorAll('.row-select:checked').length;
+                if (countLabel) countLabel.textContent = checked + ' selected';
+                if (pickBtn) pickBtn.disabled = checked === 0;
+                if (selectAll) {
+                    selectAll.checked = checked > 0 && checked === rowChecks.length;
+                    selectAll.indeterminate = checked > 0 && checked < rowChecks.length;
+                }
+            }
+
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    rowChecks.forEach(function (cb) { cb.checked = selectAll.checked; });
+                    updateState();
+                });
+            }
+            rowChecks.forEach(function (cb) { cb.addEventListener('change', updateState); });
+            updateState();
+        })();
+    </script>
+}

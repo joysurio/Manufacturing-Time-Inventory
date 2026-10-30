@@ -1,0 +1,237 @@
+@page
+@model ManufacturingTimeTracking.Pages.TimeTracking.DetailedReportModel
+@{
+    ViewData["Title"] = "Detailed Time Tracking Report";
+}
+<style>
+    .dr-surface {
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.08), transparent 35%),
+                    radial-gradient(circle at 80% 0%, rgba(244,114,182,0.08), transparent 30%),
+                    #0a0f1f;
+        color: #f8fafc;
+        border: 1px solid rgba(56,189,248,0.45);
+        box-shadow: 0 0 30px rgba(56,189,248,0.25), 0 0 60px rgba(56,189,248,0.12);
+        border-radius: 24px;
+        padding: 24px;
+    }
+    .dr-card {
+        background: rgba(15,23,42,0.92);
+        border: 1px solid rgba(125,211,252,0.35);
+        box-shadow: 0 0 22px rgba(125,211,252,0.2);
+        color: #e2e8f0;
+    }
+    .dr-subtle { color: #cbd5e1; }
+    .dr-heading { color: #fff; font-weight: 600; letter-spacing: 0.01em; }
+    .dr-label { color: #cbd5e1; font-weight: 500; letter-spacing: 0.04em; }
+    .dr-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .dr-kpi {
+        background: linear-gradient(145deg, rgba(56,189,248,0.12), rgba(15,23,42,0.9));
+        border: 1px solid rgba(56,189,248,0.45);
+        box-shadow: 0 0 18px rgba(56,189,248,0.45), 0 0 32px rgba(56,189,248,0.2);
+        border-radius: 16px;
+        padding: 14px 16px;
+        color: #e2e8f0;
+    }
+    .dr-kpi-title { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #a5f3fc; }
+    .dr-kpi-value { font-size: 20px; font-weight: 700; color: #fff; }
+</style>
+
+<div class="animate-fade-in">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <a asp-page="./Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-cyan-400/60 text-slate-100 font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_12px_rgba(56,189,248,0.45)] transition-all duration-200">← Time tracking</a>
+        <a asp-page="./Report" class="inline-flex items-center px-4 py-2 rounded-xl border border-cyan-400/60 text-slate-100 font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_12px_rgba(56,189,248,0.45)] transition-all duration-200">Summary report</a>
+        @if (User.IsInRole("Admin"))
+        {
+            <a asp-page="./EditRecords" class="inline-flex items-center px-4 py-2 rounded-xl border border-cyan-400/60 text-slate-100 font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_12px_rgba(56,189,248,0.45)] transition-all duration-200">Edit records (admin)</a>
+        }
+    </div>
+
+    <div class="dr-surface mb-6">
+        <h1 class="text-2xl dr-heading mb-1">Detailed Time Tracking Report</h1>
+        <p class="dr-subtle text-sm mb-6">Daily clock-in/out records per user, including work sessions, break periods, daily totals, and weekly balance vs 40h.</p>
+
+        <form method="get" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div class="md:col-span-3">
+                <label class="block text-sm font-medium dr-label mb-1.5">From date</label>
+                <input type="date" name="FromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd") ?? "")" class="w-full px-4 py-3 rounded-xl border border-cyan-300/40 bg-slate-900 text-white focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/30" />
+            </div>
+            <div class="md:col-span-3">
+                <label class="block text-sm font-medium dr-label mb-1.5">To date</label>
+                <input type="date" name="ToDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd") ?? "")" class="w-full px-4 py-3 rounded-xl border border-cyan-300/40 bg-slate-900 text-white focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/30" />
+            </div>
+            <div class="md:col-span-4">
+                <label class="block text-sm font-medium dr-label mb-1.5">User</label>
+                <select name="UserIdFilter" class="w-full px-4 py-3 rounded-xl border border-cyan-300/40 bg-slate-900 text-white focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/30" asp-items="Model.UserSelectList"></select>
+            </div>
+            <div class="md:col-span-2 flex gap-2">
+                <button type="submit" class="flex-1 px-5 py-3 rounded-xl bg-blue-600 border border-blue-200/70 text-white font-semibold hover:bg-blue-600 hover:border-blue-100 shadow-[0_0_18px_rgba(37,99,235,0.8),0_0_30px_rgba(37,99,235,0.45)] transition-all">Apply</button>
+                <a href="@Model.ExportPdfUrl" class="inline-flex items-center justify-center px-5 py-3 rounded-xl border border-cyan-400/60 text-slate-100 font-medium bg-slate-900 hover:bg-slate-800 shadow-[0_0_12px_rgba(56,189,248,0.45)] transition-all duration-200">Export PDF</a>
+            </div>
+        </form>
+    </div>
+
+    @if (!Model.Users.Any())
+    {
+        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100">No time tracking entries found for the selected filters.</div>
+    }
+    else
+    {
+        foreach (var u in Model.Users)
+        {
+            <div class="dr-card rounded-2xl overflow-hidden mb-6">
+                <div class="px-6 py-4 border-b border-slate-700/70 bg-slate-900/60">
+                    <h2 class="text-lg font-semibold text-white">@u.DisplayName</h2>
+                    @if (!string.IsNullOrWhiteSpace(u.FirstName) || !string.IsNullOrWhiteSpace(u.LastName) || !string.IsNullOrWhiteSpace(u.Dni))
+                    {
+                        <p class="text-sm text-slate-300 mt-1">
+                            @(string.IsNullOrWhiteSpace(u.FirstName) && string.IsNullOrWhiteSpace(u.LastName) ? "" : $"{u.FirstName} {u.LastName}".Trim())
+                            @if (!string.IsNullOrWhiteSpace(u.Dni))
+                            {
+                                @(string.IsNullOrWhiteSpace(u.FirstName) && string.IsNullOrWhiteSpace(u.LastName) ? "" : " · ")<text>DNI: @u.Dni</text>
+                            }
+                        </p>
+                    }
+                </div>
+
+                <div class="p-6 space-y-6">
+                    @* KPIs *@
+                    @{ var allDays = u.Weeks.SelectMany(w => w.Days).ToList();
+                       var totalWorked = allDays.Aggregate(TimeSpan.Zero, (a, d) => a + d.TotalWorked);
+                       var totalBreak = allDays.Aggregate(TimeSpan.Zero, (a, d) => a + d.TotalBreak);
+                       var totalDays = allDays.Count;
+                       var avgWorked = totalDays > 0 ? TimeSpan.FromMinutes(totalWorked.TotalMinutes / totalDays) : TimeSpan.Zero;
+                       var workedHours = DetailedReportModel.FormatHm(totalWorked);
+                       var breakHours = DetailedReportModel.FormatHm(totalBreak);
+                       var avgWorkedHours = DetailedReportModel.FormatHm(avgWorked);
+                    }
+                    <div class="dr-kpi-grid">
+                        <div class="dr-kpi">
+                            <div class="dr-kpi-title">Total worked</div>
+                            <div class="dr-kpi-value">@workedHours</div>
+                        </div>
+                        <div class="dr-kpi">
+                            <div class="dr-kpi-title">Total breaks</div>
+                            <div class="dr-kpi-value">@breakHours</div>
+                        </div>
+                        <div class="dr-kpi">
+                            <div class="dr-kpi-title">Avg worked / day</div>
+                            <div class="dr-kpi-value">@avgWorkedHours</div>
+                        </div>
+                        <div class="dr-kpi">
+                            <div class="dr-kpi-title">Days counted</div>
+                            <div class="dr-kpi-value">@totalDays</div>
+                        </div>
+                    </div>
+
+                    @foreach (var w in u.Weeks)
+                    {
+                        var diff = w.Difference;
+                        var diffColor = diff.TotalMinutes < 0 ? "text-red-400" : "text-emerald-300";
+
+                        <div class="rounded-2xl border border-slate-700 overflow-hidden">
+                            <div class="px-5 py-4 bg-slate-900 flex flex-wrap items-center justify-between gap-4">
+                                <div>
+                                    <p class="text-sm text-slate-300">Week</p>
+                                    <p class="font-semibold text-white">@w.WeekStartLocal.ToString("yyyy-MM-dd") → @w.WeekEndLocal.ToString("yyyy-MM-dd")</p>
+                                </div>
+                                <div class="flex flex-wrap gap-6">
+                                    <div class="text-right">
+                                        <p class="text-xs font-medium text-slate-300 uppercase tracking-wider">Worked</p>
+                                        <p class="font-semibold text-white">@DetailedReportModel.FormatHm(w.TotalWorked)</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-xs font-medium text-slate-300 uppercase tracking-wider">Breaks</p>
+                                        <p class="font-semibold text-slate-200">@DetailedReportModel.FormatHm(w.TotalBreak)</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-xs font-medium text-slate-300 uppercase tracking-wider">Theoretical</p>
+                                        <p class="font-semibold text-slate-200">@DetailedReportModel.FormatHm(w.Theoretical)</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-xs font-medium text-slate-300 uppercase tracking-wider">Difference</p>
+                                        <p class="font-semibold @diffColor">@DetailedReportModel.FormatHm(w.Difference, showSign: true)</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-slate-700 table-dark">
+                                    <thead class="bg-slate-800/80">
+                                        <tr>
+                                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Date</th>
+                                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Clock-in / Clock-out</th>
+                                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Work sessions</th>
+                                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Breaks</th>
+                                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Total breaks</th>
+                                            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-200 uppercase tracking-wider">Total worked</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800">
+                                        @foreach (var d in w.Days)
+                                        {
+                                            <tr class="hover:bg-slate-800/40 align-top">
+                                                <td class="px-4 py-3 whitespace-nowrap font-medium text-center text-white">@d.DateLocal.ToString("yyyy-MM-dd")</td>
+                                                <td class="px-4 py-3 text-center text-slate-200">
+                                                    @if (d.ClockInUtc.Any() || d.ClockOutUtc.Any())
+                                                    {
+                                                        <div class="space-y-0.5">
+                                                            @foreach (var t in d.ClockInUtc.OrderBy(x => x))
+                                                            {
+                                                                <div><span class="text-emerald-300 font-semibold">IN</span> @DetailedReportModel.FormatTimeLocal(t)</div>
+                                                            }
+                                                            @foreach (var t in d.ClockOutUtc.OrderBy(x => x))
+                                                            {
+                                                                <div><span class="text-slate-200 font-semibold">OUT</span> @DetailedReportModel.FormatTimeLocal(t)</div>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-slate-500">—</span>
+                                                    }
+                                                </td>
+                                                <td class="px-4 py-3 text-center text-slate-200">
+                                                    @if (d.SessionsUtc.Any())
+                                                    {
+                                                        <div class="space-y-0.5">
+                                                            @foreach (var s in d.SessionsUtc.OrderBy(x => x.startUtc))
+                                                            {
+                                                                <div>@DetailedReportModel.FormatTimeLocal(s.startUtc) → @DetailedReportModel.FormatTimeLocal(s.endUtc)</div>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-slate-500">—</span>
+                                                    }
+                                                </td>
+                                                <td class="px-4 py-3 text-center text-slate-300">
+                                                    @if (d.BreaksUtc.Any())
+                                                    {
+                                                        <div class="space-y-0.5">
+                                                            @foreach (var b in d.BreaksUtc.OrderBy(x => x.startUtc))
+                                                            {
+                                                                <div>@DetailedReportModel.FormatTimeLocal(b.startUtc) → @DetailedReportModel.FormatTimeLocal(b.endUtc)</div>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-slate-500">—</span>
+                                                    }
+                                                </td>
+                                                <td class="px-4 py-3 text-center text-slate-200">@DetailedReportModel.FormatHm(d.TotalBreak)</td>
+                                                <td class="px-4 py-3 text-center font-semibold text-white">@DetailedReportModel.FormatHm(d.TotalWorked)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+

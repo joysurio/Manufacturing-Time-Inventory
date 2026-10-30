@@ -1,0 +1,132 @@
+@page
+@model ManufacturingTimeTracking.Pages.Orders.CreateModel
+@{
+    ViewData["Title"] = "Create Build Order";
+}
+
+<div class="animate-fade-in w-full">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Create Build Order</h1>
+    <p class="text-slate-500 mb-6">Enter order details and select machine model and variant.</p>
+
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+        <form method="post" class="space-y-5">
+            <div asp-validation-summary="ModelOnly" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm"></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                 <div>
+                <label asp-for="BuildOrder.ExternalRef" class="block text-sm font-medium text-slate-700 mb-1.5">Order number</label>
+                <input asp-for="BuildOrder.ExternalRef" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 font-mono" />
+                <p class="text-xs text-slate-500 mt-1">Auto-generated. You can override it if needed.</p>
+                <span asp-validation-for="BuildOrder.ExternalRef" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="BuildOrder.SerialNumber" class="block text-sm font-medium text-slate-700 mb-1.5">Serial number</label>
+                <input asp-for="BuildOrder.SerialNumber" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 font-mono" />
+                <p class="text-xs text-slate-500 mt-1">Auto-generated with the order number.</p>
+                <span asp-validation-for="BuildOrder.SerialNumber" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label asp-for="BuildOrder.MachineModelId" class="block text-sm font-medium text-slate-700 mb-1.5">Machine Model</label>
+                <select asp-for="BuildOrder.MachineModelId" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" asp-items="Model.MachineModels" id="modelSelect">
+                    <option value="">-- Select Model --</option>
+                </select>
+                <span asp-validation-for="BuildOrder.MachineModelId" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="BuildOrder.MachineVariantId" class="block text-sm font-medium text-slate-700 mb-1.5">Machine Variant</label>
+                <select asp-for="BuildOrder.MachineVariantId" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" id="variantSelect">
+                    <option value="">-- Select Variant --</option>
+                </select>
+                <span asp-validation-for="BuildOrder.MachineVariantId" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+               <div>
+                <label asp-for="BuildOrder.CustomerName" class="block text-sm font-medium text-slate-700 mb-1.5">Customer Name <span class="text-red-500">*</span></label>
+                <input asp-for="BuildOrder.CustomerName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                <span asp-validation-for="BuildOrder.CustomerName" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="BuildOrder.ProjectRef" class="block text-sm font-medium text-slate-700 mb-1.5">Project Reference (optional)</label>
+                <input asp-for="BuildOrder.ProjectRef" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+            </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                    <label asp-for="BuildOrder.CustomerIdentifier" class="block text-sm font-medium text-slate-700 mb-1.5">Customer Identifier (optional)</label>
+                    <input asp-for="BuildOrder.CustomerIdentifier" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                    <span asp-validation-for="BuildOrder.CustomerIdentifier" class="text-red-600 text-sm mt-1 block"></span>
+                </div>
+                <div>
+                    <label asp-for="BuildOrder.PlantName" class="block text-sm font-medium text-slate-700 mb-1.5">Plant / Site (optional)</label>
+                    <input asp-for="BuildOrder.PlantName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                    <span asp-validation-for="BuildOrder.PlantName" class="text-red-600 text-sm mt-1 block"></span>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                    <label asp-for="BuildOrder.Location" class="block text-sm font-medium text-slate-700 mb-1.5">Location / Bay (optional)</label>
+                    <input asp-for="BuildOrder.Location" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                    <span asp-validation-for="BuildOrder.Location" class="text-red-600 text-sm mt-1 block"></span>
+                </div>
+                <div></div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+               <div>
+                <label asp-for="BuildOrder.PlannedWeek" class="block text-sm font-medium text-slate-700 mb-1.5">Planned week <span class="text-red-500">*</span></label>
+                <input asp-for="BuildOrder.PlannedWeek" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" placeholder="e.g. 2024-W12" />
+                <span asp-validation-for="BuildOrder.PlannedWeek" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="BuildOrder.DueDate" class="block text-sm font-medium text-slate-700 mb-1.5">Due Date <span class="text-red-500">*</span></label>
+                <input asp-for="BuildOrder.DueDate" type="date" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" />
+                <span asp-validation-for="BuildOrder.DueDate" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+             <div>
+                <label asp-for="BuildOrder.Priority" class="block text-sm font-medium text-slate-700 mb-1.5">Priority <span class="text-red-500">*</span></label>
+                <select asp-for="BuildOrder.Priority" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" asp-items="Model.PriorityList"></select>
+                <span asp-validation-for="BuildOrder.Priority" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            <div>
+                <label asp-for="BuildOrder.OwnerUserId" class="block text-sm font-medium text-slate-700 mb-1.5">Owner (accountable) <span class="text-red-500">*</span></label>
+                <select asp-for="BuildOrder.OwnerUserId" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200" asp-items="Model.OwnerUsers">
+                    <option value="">-- Select Owner --</option>
+                </select>
+                <span asp-validation-for="BuildOrder.OwnerUserId" class="text-red-600 text-sm mt-1 block"></span>
+            </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+            <div class="m-auto">
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200">Create</button>
+                    <a asp-page="Index" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        document.getElementById('modelSelect').addEventListener('change', function() {
+            var modelId = this.value;
+            var variantSelect = document.getElementById('variantSelect');
+            variantSelect.innerHTML = '<option value="">-- Select Variant --</option>';
+            if (modelId) {
+                fetch('/api/variants?modelId=' + modelId)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(variant => {
+                            var option = document.createElement('option');
+                            option.value = variant.id;
+                            option.textContent = variant.name + ' (' + variant.code + ')';
+                            variantSelect.appendChild(option);
+                        });
+                    });
+            }
+        });
+    </script>
+}

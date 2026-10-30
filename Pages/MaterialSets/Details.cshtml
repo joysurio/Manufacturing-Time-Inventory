@@ -1,0 +1,36 @@
+@page "{id:int}"
+@model ManufacturingTimeTracking.Pages.MaterialSets.DetailsModel
+@{
+    ViewData["Title"] = "Material Set Details";
+}
+
+<div class="animate-fade-in max-w-2xl mx-auto">
+    <div class="flex flex-wrap gap-3 mb-6">
+        <a asp-page="./Index" class="inline-flex items-center px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">← Back to list</a>
+        <a asp-page="./Edit" asp-route-id="@Model.MaterialSet!.Id" class="inline-flex items-center px-4 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700">Edit</a>
+        <a asp-page="./Duplicate" asp-route-id="@Model.MaterialSet!.Id" class="inline-flex items-center px-4 py-2 rounded-xl border border-emerald-600 text-emerald-700 font-medium hover:bg-emerald-50">Duplicate set</a>
+    </div>
+    <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+        <h1 class="text-2xl font-bold text-slate-800 mb-2">@Model.MaterialSet!.Name</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.MaterialSet.Description))
+        {
+            <p class="text-slate-600 mb-6">@Model.MaterialSet.Description</p>
+        }
+        @if (Model.TotalPrice.HasValue)
+        {
+            <p class="text-slate-700 font-semibold mb-4">Total set price: @Model.TotalPrice.Value.ToString("N2") €</p>
+        }
+        <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Materials in this set</h2>
+        <ul class="space-y-2">
+            @foreach (var item in Model.MaterialSet.Items.OrderBy(i => i.SortOrder))
+            {
+                var linePrice = item.Material?.Price.HasValue == true ? (item.Material.Price.Value * item.Quantity) : (decimal?)null;
+                <li class="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+                    <span class="font-medium text-slate-800">@(item.Material?.Name ?? "Material #" + item.MaterialId)</span>
+                    <span class="text-slate-600">Qty: @item.Quantity @(linePrice.HasValue ? " · " + linePrice.Value.ToString("N2") + " €" : "")</span>
+                </li>
+            }
+        </ul>
+        <p class="text-slate-500 text-sm mt-6">Use this set in <a asp-controller="Inventory" asp-action="MaterialOut" class="text-blue-600 hover:underline">Material Out</a> or on an order's <strong>Pick List</strong> to add all these materials at once.</p>
+    </div>
+</div>

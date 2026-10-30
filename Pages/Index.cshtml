@@ -1,0 +1,104 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<style>
+    .page-dark { background: #050915; color: #f8fafc; font-weight: 300; }
+    .card-dark {
+        background: rgba(10,15,31,0.92);
+        border: 1px solid rgba(59,130,246,0.45);
+        box-shadow: 0 0 24px rgba(59,130,246,0.28), 0 0 48px rgba(59,130,246,0.18);
+        border-radius: 18px;
+    }
+    .btn-glow {
+        border: 1px solid rgba(59,130,246,0.6);
+        box-shadow: 0 0 14px rgba(59,130,246,0.6), 0 0 28px rgba(59,130,246,0.35);
+        background: #0b1224;
+        color: #f8fafc;
+    }
+    .logo-glow {
+        box-shadow: 0 0 22px rgba(59,130,246,0.55), 0 0 44px rgba(59,130,246,0.25);
+        border: 1px solid rgba(59,130,246,0.4);
+    }
+</style>
+
+<div class="animate-fade-in page-dark">
+    <div class="flex items-center gap-4 mb-4">
+        <div class="logo-glow bg-slate-900/60 rounded-2xl px-4 py-3 inline-flex items-center justify-center">
+            <span class="text-2xl font-bold text-blue-300 tracking-tight">La F�brica de Software</span>
+        </div>
+        <div>
+            <h1 class="text-3xl font-semibold text-white mb-1">Manufacturing Time Tracking</h1>
+            <p class="text-slate-200">Dashboard</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+        <div class="card-dark p-6 hover-lift opacity-0 animate-slide-up stagger-1">
+            <p class="text-slate-300 text-sm font-medium uppercase tracking-wide">Total Orders</p>
+            <p class="text-3xl font-bold text-blue-300 mt-1">@Model.TotalOrders</p>
+        </div>
+        <div class="card-dark p-6 hover-lift opacity-0 animate-slide-up stagger-2">
+            <p class="text-slate-300 text-sm font-medium uppercase tracking-wide">Active Orders</p>
+            <p class="text-3xl font-bold text-amber-300 mt-1">@Model.ActiveOrders</p>
+        </div>
+        <div class="card-dark p-6 hover-lift opacity-0 animate-slide-up stagger-3">
+            <p class="text-slate-300 text-sm font-medium uppercase tracking-wide">Templates</p>
+            <p class="text-3xl font-bold text-cyan-200 mt-1">@Model.TotalTemplates</p>
+        </div>
+        <div class="card-dark p-6 hover-lift opacity-0 animate-slide-up stagger-4">
+            <p class="text-slate-300 text-sm font-medium uppercase tracking-wide">Machine Models</p>
+            <p class="text-3xl font-bold text-emerald-200 mt-1">@Model.TotalModels</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+        <div class="card-dark overflow-hidden animate-slide-up opacity-0 stagger-2">
+            <div class="px-6 py-4 border-b border-slate-700/80 bg-slate-900/60">
+                <h2 class="text-lg font-semibold text-white">Quick Actions</h2>
+            </div>
+            <div class="p-6 flex flex-col gap-3">
+                @if (Model.CurrentTaskId.HasValue)
+                {
+                    <a asp-page="/Tasks/Detail"
+                       asp-route-id="@Model.CurrentTaskId"
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 transition-all duration-200">
+                        Go to my current task
+                        @if (!string.IsNullOrEmpty(Model.CurrentTaskTitle))
+                        {
+                            <span class="ml-2 truncate max-w-[220px]" title="@Model.CurrentTaskTitle">(@Model.CurrentTaskTitle)</span>
+                        }
+                    </a>
+                }
+                else if (Model.CurrentStepExecId.HasValue)
+                {
+                    <a asp-page="/Orders/StepView"
+                       asp-route-stepExecId="@Model.CurrentStepExecId"
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 transition-all duration-200">
+                        Go to my current step
+                        @if (!string.IsNullOrEmpty(Model.CurrentStepTitle))
+                        {
+                            <span class="ml-2 truncate max-w-[220px]" title="@Model.CurrentStepTitle">(@Model.CurrentStepTitle)</span>
+                        }
+                    </a>
+                }
+                <a asp-page="/Orders/Sales" class="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-500 transition-all duration-200">Start a sales order</a>
+                <a asp-page="/Orders/Create" class="inline-flex items-center justify-center px-5 py-3 rounded-xl btn-glow font-medium hover:bg-slate-900 transition-all duration-200">Create New Order</a>
+                <a asp-page="/Templates/Create" class="inline-flex items-center justify-center px-5 py-3 rounded-xl border border-slate-500 text-slate-100 font-medium hover:bg-slate-800 transition-all duration-200">Create New Template</a>
+                <a asp-page="/Catalog/Models/Index" class="inline-flex items-center justify-center px-5 py-3 rounded-xl border border-slate-500 text-slate-100 font-medium hover:bg-slate-800 transition-all duration-200">Manage Models</a>
+            </div>
+        </div>
+        <div class="card-dark overflow-hidden animate-slide-up opacity-0 stagger-3">
+            <div class="px-6 py-4 border-b border-slate-700/80 bg-slate-900/60">
+                <h2 class="text-lg font-semibold text-white">Navigation</h2>
+            </div>
+            <div class="p-6 flex flex-col gap-3">
+                <a asp-page="/Orders/Sales" class="inline-flex items-center justify-center px-5 py-3 rounded-xl btn-glow font-medium hover:bg-slate-900 transition-all duration-200">Sales Orders</a>
+                <a asp-page="/Orders/Index" class="inline-flex items-center justify-center px-5 py-3 rounded-xl border border-slate-500 text-slate-100 font-medium hover:bg-slate-800 transition-all duration-200">View All Orders</a>
+                <a asp-page="/Templates/Index" class="inline-flex items-center justify-center px-5 py-3 rounded-xl border border-slate-500 text-slate-100 font-medium hover:bg-slate-800 transition-all duration-200">View All Templates</a>
+            </div>
+        </div>
+    </div>
+</div>

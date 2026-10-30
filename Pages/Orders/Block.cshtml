@@ -1,0 +1,48 @@
+@page "{id:int}"
+@model ManufacturingTimeTracking.Pages.Orders.BlockModel
+@{
+    ViewData["Title"] = "Block Order";
+}
+
+<div class="animate-fade-in w-xl">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">Block Order</h1>
+    <p class="text-slate-500 mb-6">Order <strong>@Model.BuildOrder.ExternalRef</strong> —
+        @Model.BuildOrder.SerialNumber. Provide a reason and notes to block.</p>
+
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 p-6 max-w-2xl mx-auto">
+            <form method="post" class="space-y-5">
+                <div asp-validation-summary="ModelOnly" class="p-4 rounded-xl bg-red-50 text-red-700 text-sm"></div>
+                <div>
+                    <label asp-for="BlockedReasonId" class="block text-sm font-medium text-slate-700 mb-1.5">Reason <span
+                        class="text-red-500">*</span></label>
+                        <select asp-for="BlockedReasonId"
+                                class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                asp-items="Model.BlockedReasons">
+                            <option value="">-- Select reason --</option>
+                        </select>
+                        <span asp-validation-for="BlockedReasonId" class="text-red-600 text-sm mt-1 block"></span>
+                    </div>
+                    <div>
+                        <label asp-for="BlockedNotes" class="block text-sm font-medium text-slate-700 mb-1.5">Notes <span
+                            class="text-red-500">*</span></label>
+                            <textarea asp-for="BlockedNotes" rows="4"
+                                      class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                      placeholder="Describe why the order is blocked..."></textarea>
+                            <span asp-validation-for="BlockedNotes" class="text-red-600 text-sm mt-1 block"></span>
+                        </div>
+                        <div class="flex gap-3 pt-2">
+                            <div class="m-auto">
+                                <button type="submit"
+                                        class="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-medium hover:bg-amber-700">Block
+                                    Order</button>
+                                    <a asp-page="./Details" asp-route-id="@Model.BuildOrder.Id"
+                                       class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50">Cancel</a>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                @section Scripts {
+                    <partial name="_ValidationScriptsPartial" />
+                }
